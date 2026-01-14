@@ -148,7 +148,7 @@ number:
             condition: {lambda: 'return x == 0;'}
             then: [- fan.turn_off: fan_1]
             else: [- fan.turn_on: {id: fan_1, speed: !lambda 'return int(x);'}]
-    lambda: "return id(fan_1).state ? id(fan_1).speed * 100 : 0;"
+    lambda: "return id(fan_1).state ? id(fan_1).speed : 0;"
 
   - platform: template
     name: "Vitesse Manuelle L2"
@@ -164,7 +164,7 @@ number:
             condition: {lambda: 'return x == 0;'}
             then: [- fan.turn_off: fan_2]
             else: [- fan.turn_on: {id: fan_2, speed: !lambda 'return int(x);'}]
-    lambda: "return id(fan_2).state ? id(fan_2).speed * 100 : 0;"
+    lambda: "return id(fan_2).state ? id(fan_2).speed : 0;"
 
 # --- SWITCHES MODES ---
 switch:

@@ -156,7 +156,7 @@ number:
                   args: ['x']
     lambda: |-
       if (id(arctic_fan).state) {
-        return id(arctic_fan).speed * 100;
+        return id(arctic_fan).speed;
       } else {
         return 0;
       }
