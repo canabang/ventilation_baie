@@ -1,0 +1,10 @@
+# ESPHome temporary files
+.esphome/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets (IMPORTANT: Keep your secrets safe!)
+secrets.yaml
