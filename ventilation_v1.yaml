@@ -33,6 +33,35 @@ captive_portal:
 web_server:
   port: 80
 
+# --- LOGIQUE DE CONTRÔLE ---
+script:
+  - id: apply_fan_curve
+    then:
+      - lambda: |-
+          if (!id(auto_mode).state) return;
+          if (id(boost_mode).state) return; // Priorité au mode Boost
+          
+          float temp = id(temp_ambient).state;
+          if (std::isnan(temp)) return; // Sécurité si pas encore de lecture
+
+          float t_min = id(temp_min).state;
+          float t_max = id(temp_max).state;
+          int new_speed = 0;
+
+          if (temp < t_min) {
+            new_speed = 0;
+          } else if (temp >= t_max) {
+            new_speed = 100;
+          } else {
+            new_speed = (int)(((temp - t_min) / (t_max - t_min)) * 100);
+          }
+
+          if (new_speed == 0) {
+            if (id(arctic_fan).state) id(arctic_fan).turn_off().perform();
+          } else {
+            id(arctic_fan).turn_on().set_speed(new_speed).perform();
+          }
+
 # Sortie PWM pour contrôler la vitesse
 output:
   - platform: ledc
@@ -72,51 +101,32 @@ sensor:
     update_interval: 60s
     id: esp32_temp
 
-  # Capteur DHT22 pour température et humidité
+  # Capteur DHT22 pour température
   - platform: dht
-    pin: GPIO7  # Changez ce GPIO selon votre câblage
+    id: dht_sensor
+    pin: GPIO7
     model: DHT22
     temperature:
       name: "Température Ambiante"
       id: temp_ambient
       on_value:
         then:
-          - if:
-              condition:
-                switch.is_on: auto_mode
-              then:
-                - lambda: |-
-                    // Automation: ajustement vitesse selon température (seulement si mode auto activé)
-                    float temp = id(temp_ambient).state;
-                    int speed = 0;
-                    
-                    if (temp < 20) {
-                      speed = 0;  // Ventilateur éteint
-                    } else if (temp < 25) {
-                      speed = 25;  // Vitesse minimale
-                    } else if (temp < 30) {
-                      speed = 50;  // Vitesse moyenne
-                    } else if (temp < 35) {
-                      speed = 75;  // Vitesse élevée
-                    } else {
-                      speed = 100;  // Vitesse maximale
-                    }
-                    
-                    // Applique la nouvelle vitesse
-                    if (speed == 0) {
-                      auto call = id(arctic_fan).turn_off();
-                      call.perform();
-                    } else {
-                      auto call = id(arctic_fan).turn_on();
-                      call.set_speed(speed);
-                      call.perform();
-                    }
-                    
-                    ESP_LOGI("climate", "Mode AUTO - Température: %.1f°C → Ventilateur: %d%%", temp, speed);
-    humidity:
-      name: "Humidité Ambiante"
-      id: humidity_ambient
-    update_interval: 30s  # Mise à jour toutes les 30 secondes
+          - script.execute: apply_fan_curve
+    update_interval: 30s
+
+  # Capteur de vitesse en % pour l'affichage
+  - platform: template
+    name: "Puissance Ventilateur"
+    unit_of_measurement: "%"
+    icon: "mdi:percent"
+    accuracy_decimals: 0
+    lambda: |-
+      if (id(arctic_fan).state) {
+        return id(arctic_fan).speed;
+      } else {
+        return 0;
+      }
+    update_interval: 10s
 
 # Ventilateur
 fan:
@@ -126,43 +136,88 @@ fan:
     id: arctic_fan
     speed_count: 100
 
-# Slider pour contrôle manuel de la vitesse (0-100%)
-# Synchronisé avec l'état réel du ventilateur
+# Contrôles et Réglages
 number:
+  # Slider pour contrôle manuel
   - platform: template
     name: "Vitesse Manuelle"
     id: manual_speed
     min_value: 0
     max_value: 100
     step: 5
-    optimistic: false  # Le slider reflète l'état réel du ventilateur
     unit_of_measurement: "%"
     mode: slider
     icon: "mdi:fan"
     set_action:
       then:
+        - lambda: |-
+            id(auto_mode).turn_off();
+            id(boost_mode).turn_off(); // Éteint le boost si on touche au manuel
+            ESP_LOGI("manual", "Vitesse manuelle demandée: %.0f%% - Désactivation Modes Auto/Boost", x);
         - if:
             condition:
-              lambda: 'return x == 0;'
+              lambda: 'return int(x) == 0;'
             then:
               - fan.turn_off: arctic_fan
-              - logger.log: "Ventilateur éteint"
             else:
               - fan.turn_on:
                   id: arctic_fan
                   speed: !lambda 'return int(x);'
-              - logger.log:
-                  format: "Ventilateur à %.0f%%"
-                  args: ['x']
-    lambda: |-
-      if (id(arctic_fan).state) {
-        return id(arctic_fan).speed;
-      } else {
-        return 0;
-      }
+    lambda: "return id(arctic_fan).state ? id(arctic_fan).speed : 0;"
 
-# Switch pour activer/désactiver le contrôle automatique
+  # Réglage dynamique de la température MIN
+  - platform: template
+    name: "Consigne Temp Min"
+    id: temp_min
+    min_value: 15
+    max_value: 35
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+    icon: "mdi:thermometer-low"
+    optimistic: true
+    restore_value: true
+    initial_value: 25
+    set_action:
+      then:
+        - lambda: 'id(temp_min).publish_state(x);' # Nécessaire car on surcharge set_action
+        - script.execute: apply_fan_curve
+
+  # Réglage dynamique de la température MAX
+  - platform: template
+    name: "Consigne Temp Max"
+    id: temp_max
+    min_value: 25
+    max_value: 50
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+    icon: "mdi:thermometer-high"
+    optimistic: true
+    restore_value: true
+    initial_value: 35
+    set_action:
+      then:
+        - lambda: 'id(temp_max).publish_state(x);' # Nécessaire car on surcharge
+        - script.execute: apply_fan_curve
+
+  # Réglage de la durée du Boost (en minutes)
+  - platform: template
+    name: "Durée Boost"
+    id: boost_duration
+    min_value: 1
+    max_value: 60
+    step: 1
+    unit_of_measurement: "min"
+    mode: box
+    icon: "mdi:timer-outline"
+    optimistic: true
+    restore_value: true
+    initial_value: 10
+
+# Switchs
 switch:
+  # Contrôle automatique
   - platform: template
     name: "Mode Automatique"
     id: auto_mode
@@ -170,6 +225,24 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:thermostat-auto"
     turn_on_action:
-      - logger.log: "Mode automatique activé - Contrôle par température"
+      - logger.log: "Mode automatique activé"
+      - script.execute: apply_fan_curve
     turn_off_action:
-      - logger.log: "Mode automatique désactivé - Contrôle manuel"
+      - logger.log: "Mode automatique désactivé"
+
+  # MODE BOOST (100% pendant X minutes)
+  - platform: template
+    name: "Mode Boost"
+    id: boost_mode
+    optimistic: true
+    icon: "mdi:rocket-launch"
+    turn_on_action:
+      - logger.log: "🚀 BOOST ACTIF !"
+      - fan.turn_on:
+          id: arctic_fan
+          speed: 100
+      - delay: !lambda 'return id(boost_duration).state * 60000;'
+      - switch.turn_off: boost_mode
+    turn_off_action:
+      - logger.log: "Fin du Boost - Retour au mode précédent"
+      - script.execute: apply_fan_curve
