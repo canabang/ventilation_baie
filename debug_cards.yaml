@@ -1,0 +1,143 @@
+# =================================================================================================
+# 📊 CARTES DE DEBUG (ApexCharts)
+# =================================================================================================
+# Ces cartes sont destinées à un dashboard de test/debug pour analyser le comportement
+# du système (comparaison température, consignes, puissance et RPM).
+#
+# PRÉ-REQUIS :
+# Vous devez avoir installé "ApexCharts Card" via HACS.
+# =================================================================================================
+
+# --- CARTE LIGNE 1 ---
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: Debug Ventilation - Ligne 1
+    show_states: true
+    colorize_states: true
+  graph_span: 1h
+  update_interval: 10s
+  yaxis:
+    - id: temp
+      min: 15
+      max: 45
+      decimals: 1
+      apex_config:
+        tickAmount: 4
+    - id: power
+      opposite: true
+      min: 0
+      max: 100
+      apex_config:
+        tickAmount: 2
+    - id: rpm
+      show: false
+  series:
+    - entity: sensor.esp_fan_temperature_ligne_1
+      name: Temp L1
+      yaxis_id: temp
+      type: area
+      color: "#ff5252"
+      opacity: 0.3
+    - entity: number.esp_fan_consigne_temp_min
+      name: Seuil Min
+      yaxis_id: temp
+      stroke_width: 2
+      curve: stepline
+      color: "#448aff"
+    - entity: number.esp_fan_consigne_temp_max
+      name: Seuil Max
+      yaxis_id: temp
+      stroke_width: 2
+      curve: stepline
+      color: "#ffab40"
+    - entity: sensor.esp_fan_puissance_ventilateur_l1
+      name: Puis. %
+      yaxis_id: power
+      type: line
+      stroke_width: 3
+      color: "#69f0ae"
+    - entity: sensor.esp_fan_vitesse_ligne_1
+      name: RPM
+      yaxis_id: rpm
+      type: line
+      stroke_width: 1
+      color: "#bdbdbd"
+
+# --- CARTE LIGNE 2 ---
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: Debug Ventilation - Ligne 2
+    show_states: true
+    colorize_states: true
+  graph_span: 1h
+  update_interval: 10s
+  yaxis:
+    - id: temp
+      min: 15
+      max: 45
+      decimals: 1
+      apex_config:
+        tickAmount: 4
+    - id: power
+      opposite: true
+      min: 0
+      max: 100
+      apex_config:
+        tickAmount: 2
+    - id: rpm
+      show: false
+  series:
+    - entity: sensor.esp_fan_temperature_ligne_2
+      name: Temp L2
+      yaxis_id: temp
+      type: area
+      color: "#ff9800"
+      opacity: 0.3
+    - entity: number.esp_fan_consigne_temp_min
+      name: Seuil Min
+      yaxis_id: temp
+      stroke_width: 2
+      curve: stepline
+      color: "#448aff"
+    - entity: number.esp_fan_consigne_temp_max
+      name: Seuil Max
+      yaxis_id: temp
+      stroke_width: 2
+      curve: stepline
+      color: "#ffab40"
+    - entity: sensor.esp_fan_puissance_ventilateur_l2
+      name: Puis. L2 %
+      yaxis_id: power
+      type: line
+      stroke_width: 3
+      color: "#00e676"
+    - entity: sensor.esp_fan_vitesse_ligne_2
+      name: RPM L2
+      yaxis_id: rpm
+      type: line
+      stroke_width: 1
+      color: "#9e9e9e"
+
+# --- CARTE COMPARATIVE ---
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: Comparatif L1 vs L2
+  graph_span: 30m
+  series:
+    - entity: sensor.esp_fan_temperature_ligne_1
+      name: Temp L1
+      color: red
+    - entity: sensor.esp_fan_temperature_ligne_2
+      name: Temp L2
+      color: orange
+    - entity: sensor.esp_fan_puissance_ventilateur_l1
+      name: Puis L1 %
+      color: green
+      type: line
+    - entity: sensor.esp_fan_puissance_ventilateur_l2
+      name: Puis L2 %
+      color: blue
+      type: line

@@ -94,7 +94,10 @@ Avant l'installation finale dans la baie, il est recommandé de valider le monta
 
 ### 3. Dashboard Home Assistant
 1.  Installez les pré-requis via **HACS** : `Mushroom`, `Streamline Card`, `Card Mod`.
-2.  Utilisez le fichier [ventilation_card.yaml](./ventilation_card.yaml) pour créer votre interface (suivez les instructions à l'intérieur du fichier).
+2.  Utilisez le fichier [ventilation_card.yaml](./ventilation_card.yaml) pour créer votre interface.
+3.  **Debug** : En option, utilisez [debug_cards.yaml](./debug_cards.yaml) avec `ApexCharts Card` pour une analyse graphique détaillée.
+
+![Aperçu des graphiques de debug](docs/debug_graphs.png)
 
 ---
 

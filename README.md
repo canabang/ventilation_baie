@@ -29,6 +29,9 @@ Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fix
 ### Aperçu des Alertes
 ![Alertes du Dashboard](docs/dashboard_alerts.png)
 
+### Graphiques de Debug (ApexCharts)
+![Graphiques de Debug](docs/debug_graphs.png)
+
 ---
 
 ## 📂 Structure du Projet
@@ -36,6 +39,7 @@ Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fix
 *   **`ventilation_v2.yaml`** : Configuration principale ESPHome (Code source à flasher).
 *   **`.base.yaml`** : Configuration commune (WiFi, API, OTA).
 *   **`ventilation_card.yaml`** : Code YAML complet pour le dashboard Home Assistant (Templates + Vue).
+*   **`debug_cards.yaml`** : Cartes ApexCharts pour le debug et l'analyse système.
 *   **`recorder.yaml`** : Configuration recommandée pour l'historique Home Assistant.
 *   **`TUTORIAL.md`** : Guide pas à pas pour le câblage et l'installation.
 
