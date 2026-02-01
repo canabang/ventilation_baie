@@ -54,7 +54,7 @@ output:
 # CAPTEURS : TACHYMÈTRES (RPM) ET DHT22 (Température/Humidité)
 # =================================================================================================
 sensor:
-  # --- LIGNE 1 (Zone Haute) ---
+  # --- LIGNE 1 (Zone Basse) ---
   
   # Tachymètre Ligne 1 (GPIO4)
   - platform: pulse_counter
@@ -92,7 +92,7 @@ sensor:
       return id(fan_1).state ? id(fan_1).speed : 0;
     update_interval: 5s
 
-  # --- LIGNE 2 (Zone Basse) ---
+  # --- LIGNE 2 (Zone Haute) ---
   
   # Tachymètre Ligne 2 (GPIO36)
   - platform: pulse_counter

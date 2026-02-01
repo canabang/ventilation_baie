@@ -1,5 +1,5 @@
 # =================================================================================================
-# 📊 CARTES DE DEBUG (ApexCharts)
+# 📊 CARTES DE DEBUG (ApexCharts) - Version Finalisée
 # =================================================================================================
 # Ces cartes sont destinées à un dashboard de test/debug pour analyser le comportement
 # du système (comparaison température, consignes, puissance et RPM).
@@ -8,19 +8,19 @@
 # Vous devez avoir installé "ApexCharts Card" via HACS.
 # =================================================================================================
 
-# --- CARTE LIGNE 1 ---
+# --- CARTE LIGNE 1 (bas) ---
 - type: custom:apexcharts-card
   header:
     show: true
-    title: Debug Ventilation - Ligne 1
+    title: Debug Ventilation - Ligne 1 (bas)
     show_states: true
     colorize_states: true
-  graph_span: 1h
+  graph_span: 2h
   update_interval: 10s
   yaxis:
     - id: temp
-      min: 15
-      max: 45
+      min: 21
+      max: 29
       decimals: 1
       apex_config:
         tickAmount: 4
@@ -39,6 +39,7 @@
       type: area
       color: "#ff5252"
       opacity: 0.3
+      stroke_width: 2
     - entity: number.esp_fan_consigne_temp_min
       name: Seuil Min
       yaxis_id: temp
@@ -64,19 +65,19 @@
       stroke_width: 1
       color: "#bdbdbd"
 
-# --- CARTE LIGNE 2 ---
+# --- CARTE LIGNE 2 (haut) ---
 - type: custom:apexcharts-card
   header:
     show: true
-    title: Debug Ventilation - Ligne 2
+    title: Debug Ventilation - Ligne 2 (haut)
     show_states: true
     colorize_states: true
-  graph_span: 1h
+  graph_span: 2h
   update_interval: 10s
   yaxis:
     - id: temp
-      min: 15
-      max: 45
+      min: 21
+      max: 29
       decimals: 1
       apex_config:
         tickAmount: 4
@@ -95,6 +96,7 @@
       type: area
       color: "#ff9800"
       opacity: 0.3
+      stroke_width: 2
     - entity: number.esp_fan_consigne_temp_min
       name: Seuil Min
       yaxis_id: temp
@@ -130,8 +132,8 @@
     stroke_width: 1.5
   yaxis:
     - id: temp
-      min: 15
-      max: 40
+      min: 21
+      max: 29
       decimals: 1
       apex_config:
         tickAmount: 4
