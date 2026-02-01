@@ -1,0 +1,205 @@
+#substitutions:
+#  name: "a changer"
+#  idname: "a changer" # "_" est le seul caractère autoriser
+#  board: esp32dev
+#  type: esp-idf # ou arduino
+#  loglevel: DEBUG #VERY_VERBOSE
+#  static_ip: a changer
+#
+#packages:
+#  base: !include .base.yaml
+
+esphome:
+  name: ${name}
+  friendly_name: ${name}
+#  on_boot:
+#    - priority: 100
+#      then:
+#        lambda: |-
+#          id(cpu_speed) = ESP.getCpuFreqMHz();
+
+esp32:
+  board: ${board}
+  framework:
+    type: ${type}
+
+#globals:
+#  - id: cpu_speed
+#    type: int
+#    restore_value: no
+#    initial_value: '0'
+
+# Enable logging
+logger:
+  level: ${loglevel} #VERY_VERBOSE #DEBUG
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: True
+  manual_ip:
+    # Set this to the IP of the ESP
+    static_ip: ${static_ip}
+    # Set this to the IP address of the router. Often ends with .1
+    gateway: 192.168.1.2
+    # The subnet of the network. 255.255.255.0 works for most home networks.
+    subnet: 255.255.255.0
+    dns1: 192.168.1.2
+    dns2: 192.168.1.1
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "hotspot ${name}"
+    password: !secret hotspot_password
+
+captive_portal:
+
+debug:
+  update_interval: 5s
+
+web_server:
+  port: 80
+  version: 3
+  local: true
+  include_internal: true
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: Europe/Paris  # ou votre timezone
+    on_time_sync:
+      then:
+        - logger.log: "Synchronized system clock"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "@ip"
+      icon: mdi:ip-network
+      id: ip_addr
+    ssid:
+      name: "SSID"
+      icon: mdi:wifi
+      id: connected_ssid
+    bssid:
+      name: "BSSID"
+      icon: mdi:router-wireless
+      id: connected_bssid
+    mac_address:
+      name: "@mac"
+      icon: mdi:ethernet
+      id: device_mac
+  - platform: version
+    name: "Version"
+    icon: mdi:chip
+  - platform: template
+    name: "HA time"
+    icon: mdi:clock-outline
+    lambda: |-
+      char str[17];
+      time_t currTime = id(homeassistant_time).now().timestamp;
+      strftime(str, sizeof(str), "%H:%M %d-%m-%Y", localtime(&currTime));
+      return  { str };
+    update_interval: 30s
+    entity_category: "diagnostic"
+  # - platform: template  ##### obsoléte ????
+  #   name: "Uptime calc"
+  #   icon: mdi:timer-outline
+  #   lambda: |-
+  #     int seconds = id(uptime_sensor).state;
+  #     int days = seconds / 86400;
+  #     seconds = seconds % 86400;
+  #     int hours = seconds / 3600;
+  #     seconds = seconds % 3600;
+  #     int minutes = seconds / 60;
+
+  #     // Renvoie la chaîne formatée
+  #     return (days > 0 ? std::to_string(days) + " jours " : "") + 
+  #            (hours > 0 ? std::to_string(hours) + " h " : "") +
+  #            (minutes > 0 ? std::to_string(minutes) + " min" : "0 min");
+  #   update_interval: 30s
+  #   entity_category: "diagnostic"
+  - platform: uptime
+    name: "Uptime"
+    icon: mdi:clock-fast
+    update_interval: 15s
+    format:
+      days: " j "
+      hours: " h "
+      minutes: " mn "
+      seconds: " s"
+
+binary_sensor:
+  - platform: status
+    name: "status"
+    icon: mdi:check-network-outline
+
+sensor:
+  # - platform: uptime  ##### utile ?
+  #   name: Uptime raw
+  #   icon: mdi:clock-start
+  #   id: uptime_sensor
+  #   update_interval: 15s
+  - platform: internal_temperature
+    name: "Interntemp"
+    id: interntemp
+    icon: mdi:thermometer
+    update_interval: 30s
+  - platform: wifi_signal
+    name: "Wifi signal db"
+    icon: mdi:wifi-strength-4
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+  - platform: copy # Reports the WiFi signal strength in %
+    source_id: wifi_signal_db
+    name: "Wifi signal %"
+    id: wifi_percent
+    icon: mdi:signal
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+#  - platform: template
+#    id: esp_memory
+#    icon: mdi:memory
+#    name: ESP Free Memory
+#    lambda: return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
+#    unit_of_measurement: 'kB'
+#    state_class: measurement
+#    entity_category: "diagnostic"
+#  - platform: template
+#    name: "ESP CPU Speed"
+#    id: esp_cpu
+#    accuracy_decimals: 0
+#    icon: mdi:cpu-32-bit
+#    unit_of_measurement: Mhz
+#    disabled_by_default: False
+#    lambda: |-
+#      return (id(cpu_speed));
+#    entity_category: "diagnostic"
+#    update_interval: 10s
+#  - platform: debug
+#    free:
+#      name: "Heap Free"
+#      icon: mdi:memory
+#    block:
+#      name: "Heap Max Block" 
+#      icon: mdi:memory
+#    loop_time:
+#      name: "Loop Time"
+#      icon: mdi:speedometer
+
+button:
+  - platform: restart
+    name: "Restart"
+    icon: mdi:restart
+  - platform: factory_reset
+    name: "Factory reset"
+    id: "factory_reset_button"
+    icon: mdi:factory
+#    id: factory_reset_btn
