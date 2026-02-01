@@ -43,6 +43,32 @@ streamline_templates:
             border-radius: 20px !important;
             transition: all 0.3s ease !important;
           }
+  mushroom_alert_card_v2:
+    default:
+      - attribute: state
+      - icon: mdi:alert-circle
+    card:
+      type: custom:mushroom-template-card
+      primary: '[[name]]'
+      secondary: |-
+        {% if '[[attribute]]' == 'state' %}
+        {{ states('[[entity]]') }}
+        {% else %}
+        {{ state_attr('[[entity]]', '[[attribute]]') }}
+        {% endif %}
+      icon: '[[icon]]'
+      icon_color: red
+      tap_action:
+        action: more-info
+      card_mod:
+        style: |
+          ha-card {
+            background: rgba(255, 0, 0, 0.15) !important;
+            backdrop-filter: none !important;
+            border: 2px solid red !important;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6) !important;
+            border-radius: 20px !important;
+          }
   mushroom_switch_card_v2:
     default:
       - icon: mdi:power
@@ -137,6 +163,24 @@ streamline_templates:
             transform: translateY(-2px) !important;
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
           }
+          {% if is_state('[[entity]]', 'on') %}
+          mushroom-shape-icon {
+            {% set percentage = state_attr('[[entity]]', 'percentage') | int %}
+            {% if percentage > 75 %}
+              animation: spin 0.5s linear infinite;
+            {% elif percentage > 50 %}
+              animation: spin 1s linear infinite;
+            {% elif percentage > 25 %}
+              animation: spin 2s linear infinite;
+            {% else %}
+              animation: spin 3s linear infinite;
+            {% endif %}
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          {% endif %}
   mushroom_number_buttons:
     default:
       - icon: mdi:numeric
@@ -189,19 +233,19 @@ views:
         cards:
           - type: custom:mushroom-title-card
             title: Paramètres Globaux
-          - type: custom:streamline-card
-            template: mushroom_attribute_card_v2
-            variables:
-              - name: System Alert
-              - icon: mdi:alert-circle
-              - entity: binary_sensor.esp_fan_alerte_surchauffe_interlock
-              - attribute: state
-            card_mod:
-              style: |
-                ha-card { 
-                  border: none !important; box-shadow: none !important; 
-                  display: {{ 'none' if is_state('binary_sensor.esp_fan_alerte_surchauffe_interlock', 'off') else 'block' }};
-                }
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: binary_sensor.esp_fan_alerte_surchauffe_interlock
+                state: 'on'
+            card:
+              type: custom:streamline-card
+              template: mushroom_alert_card_v2
+              variables:
+                - name: System Alert
+                - icon: mdi:fire-alert
+                - entity: binary_sensor.esp_fan_alerte_surchauffe_interlock
+                - attribute: state
           - square: false
             type: grid
             columns: 2
@@ -244,6 +288,19 @@ views:
         cards:
           - type: custom:mushroom-title-card
             title: Ligne 1
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: binary_sensor.esp_fan_alerte_capteur_l1
+                state: 'on'
+            card:
+              type: custom:streamline-card
+              template: mushroom_alert_card_v2
+              variables:
+                - name: Capteur Défaillant
+                - icon: mdi:thermometer-alert
+                - entity: binary_sensor.esp_fan_alerte_capteur_l1
+                - attribute: state
           - type: grid
             columns: 2
             square: false
@@ -293,6 +350,19 @@ views:
         cards:
           - type: custom:mushroom-title-card
             title: Ligne 2
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: binary_sensor.esp_fan_alerte_capteur_l2
+                state: 'on'
+            card:
+              type: custom:streamline-card
+              template: mushroom_alert_card_v2
+              variables:
+                - name: Capteur Défaillant
+                - icon: mdi:thermometer-alert
+                - entity: binary_sensor.esp_fan_alerte_capteur_l2
+                - attribute: state
           - type: grid
             columns: 2
             square: false
