@@ -55,7 +55,7 @@
       name: Puis. %
       yaxis_id: power
       type: line
-      stroke_width: 3
+      stroke_width: 2
       color: "#69f0ae"
     - entity: sensor.esp_fan_vitesse_ligne_1
       name: RPM
@@ -111,7 +111,7 @@
       name: Puis. L2 %
       yaxis_id: power
       type: line
-      stroke_width: 3
+      stroke_width: 2
       color: "#00e676"
     - entity: sensor.esp_fan_vitesse_ligne_2
       name: RPM L2
@@ -125,19 +125,38 @@
   header:
     show: true
     title: Comparatif L1 vs L2
-  graph_span: 30m
+  graph_span: 2h
+  all_series_config:
+    stroke_width: 1.5
+  yaxis:
+    - id: temp
+      min: 15
+      max: 40
+      decimals: 1
+      apex_config:
+        tickAmount: 4
+    - id: power
+      opposite: true
+      min: 0
+      max: 100
+      apex_config:
+        tickAmount: 2
   series:
     - entity: sensor.esp_fan_temperature_ligne_1
       name: Temp L1
+      yaxis_id: temp
       color: red
     - entity: sensor.esp_fan_temperature_ligne_2
       name: Temp L2
+      yaxis_id: temp
       color: orange
     - entity: sensor.esp_fan_puissance_ventilateur_l1
       name: Puis L1 %
+      yaxis_id: power
       color: green
       type: line
     - entity: sensor.esp_fan_puissance_ventilateur_l2
       name: Puis L2 %
+      yaxis_id: power
       color: blue
       type: line
