@@ -26,6 +26,9 @@ Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fix
     *   **Interlock Surchauffe** : Si la T° dépasse le seuil critique (`Max + 5°C`), toutes les lignes passent à 100%.
     *   **Indicateur RPM** : Surveillance de la vitesse réelle des ventilateurs.
 
+### Aperçu des Alertes
+![Alertes du Dashboard](docs/dashboard_alerts.png)
+
 ---
 
 ## 📂 Structure du Projet

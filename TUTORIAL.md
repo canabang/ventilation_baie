@@ -66,8 +66,10 @@ Avant l'installation finale dans la baie, il est recommandé de valider le monta
 1.  **RPM** : Faites tourner les ventilateurs à la main, la valeur doit s'afficher dans HA.
 2.  **Température** : Soufflez sur les capteurs, la courbe doit monter.
 3.  **Commandes** : Testez le Slider Manuel et le Boost.
-4.  **perte de sonde** : Débranchez une sonde et vérifiez que la ligne se met bien à 50%.
-5.  **surchauffe** : Chauffez une sonde au dessus de 30°C et vérifiez que la ligne se met bien à 100%.
+4.  **Perte de sonde** : Débranchez une sonde et vérifiez que la ligne se met bien à 50% et que l'alerte apparaît.
+5.  **Surchauffe** : Chauffez une sonde au-dessus de 30°C (ou baissez le seuil Max) et vérifiez que la ligne se met à 100% et que l'alerte interlock s'affiche.
+
+![Détail des alertes actives](docs/dashboard_alerts.png)
 
 ---
 
