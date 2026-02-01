@@ -1,80 +1,120 @@
-#substitutions:
-#  name: "a changer"
-#  idname: "a changer" # "_" est le seul caractère autoriser
-#  board: esp32dev
-#  type: esp-idf # ou arduino
-#  loglevel: DEBUG #VERY_VERBOSE
-#  static_ip: a changer
+# =================================================================================================
+# 📂 CONFIGURATION DE BASE ESPHOME (Partagée entre tous les projets ESP32)
+# =================================================================================================
+# Ce fichier contient la configuration commune pour tous vos modules ESP32 sous ESPHome.
+# Il inclut : WiFi, API, OTA, capteurs système (uptime, signal WiFi, température interne, etc.)
 #
-#packages:
-#  base: !include .base.yaml
+# MODE D'EMPLOI :
+# 1. Copiez ce fichier `.base.yaml` dans votre dossier ESPHome.
+# 2. Créez un fichier `secrets.yaml` avec vos identifiants WiFi (voir exemple ci-dessous).
+# 3. Dans vos projets, incluez ce fichier via `packages: base: !include .base.yaml`.
+# 4. Définissez les substitutions nécessaires dans votre fichier principal (name, board, IP, etc.).
+# =================================================================================================
 
+# -------------------------------------------------------------------------------------------------
+# ⚙️ EXEMPLE DE SUBSTITUTIONS À DÉFINIR DANS VOTRE FICHIER PRINCIPAL
+# -------------------------------------------------------------------------------------------------
+# Décommentez et adaptez ces lignes dans votre projet (ex: ventilation_v2.yaml) :
+#
+# substitutions:
+#   name: "mon-esp32"                  # Nom unique du module
+#   board: esp32-s3-devkitc-1          # Type de carte ESP32
+#   type: esp-idf                      # Framework (esp-idf ou arduino)
+#   loglevel: INFO                     # Niveau de log (DEBUG, INFO, WARN, ERROR)
+#   static_ip: 192.168.1.100           # Adresse IP fixe du module
+#
+# packages:
+#   base: !include .base.yaml          # Inclusion de ce fichier
+# -------------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------------
+# 🔐 FICHIER secrets.yaml (à créer dans le même dossier)
+# -------------------------------------------------------------------------------------------------
+# Créez un fichier `secrets.yaml` avec le contenu suivant (remplacez par vos vraies valeurs) :
+#
+# wifi_ssid: "MonReseauWiFi"
+# wifi_password: "MotDePasseSuperSecret"
+# hotspot_password: "FallbackHotspot123"  # Mot de passe du point d'accès de secours
+# -------------------------------------------------------------------------------------------------
+
+# =================================================================================================
+# CONFIGURATION ESPHOME
+# =================================================================================================
 esphome:
   name: ${name}
   friendly_name: ${name}
-#  on_boot:
-#    - priority: 100
-#      then:
-#        lambda: |-
-#          id(cpu_speed) = ESP.getCpuFreqMHz();
 
 esp32:
   board: ${board}
   framework:
     type: ${type}
 
-#globals:
-#  - id: cpu_speed
-#    type: int
-#    restore_value: no
-#    initial_value: '0'
-
-# Enable logging
+# =================================================================================================
+# JOURNALISATION (LOGS)
+# =================================================================================================
 logger:
-  level: ${loglevel} #VERY_VERBOSE #DEBUG
+  level: ${loglevel}
 
+# =================================================================================================
+# MISE À JOUR OTA (Over-The-Air)
+# =================================================================================================
+# Permet de mettre à jour le firmware via WiFi sans câble USB
 ota:
   - platform: esphome
     id: ota_esphome
 
+# =================================================================================================
+# CONFIGURATION RÉSEAU WiFi
+# =================================================================================================
 wifi:
+  # Identifiants WiFi (stockés dans secrets.yaml pour la sécurité)
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  fast_connect: True
+  fast_connect: true  # Connexion plus rapide en mémorisant le dernier canal WiFi
+  
+  # Configuration IP Statique (recommandée pour les devices domotiques)
   manual_ip:
-    # Set this to the IP of the ESP
-    static_ip: ${static_ip}
-    # Set this to the IP address of the router. Often ends with .1
-    gateway: 192.168.1.2
-    # The subnet of the network. 255.255.255.0 works for most home networks.
-    subnet: 255.255.255.0
-    dns1: 192.168.1.2
-    dns2: 192.168.1.1
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
+    static_ip: ${static_ip}         # ⚠️ À définir dans votre fichier principal (ex: 192.168.1.100)
+    gateway: 192.168.1.1            # ⚠️ Adaptez à votre routeur (souvent .1 ou .254)
+    subnet: 255.255.255.0           # Masque réseau standard pour les réseaux domestiques
+    dns1: 192.168.1.1               # ⚠️ DNS primaire (souvent identique à la gateway)
+    dns2: 8.8.8.8                   # DNS secondaire (Google DNS comme backup)
+  
+  # Point d'accès de secours (Fallback Hotspot)
+  # Si la connexion WiFi échoue, l'ESP32 crée un hotspot pour configuration
   ap:
-    ssid: "hotspot ${name}"
+    ssid: "Hotspot ${name}"
     password: !secret hotspot_password
 
+# Portail captif (interface web de configuration en mode hotspot)
 captive_portal:
 
-debug:
-  update_interval: 5s
-
+# =================================================================================================
+# SERVEUR WEB INTÉGRÉ
+# =================================================================================================
+# Interface web accessible sur http://<IP_ESP32>
 web_server:
   port: 80
   version: 3
   local: true
   include_internal: true
 
+# =================================================================================================
+# SYNCHRONISATION HORAIRE (Home Assistant)
+# =================================================================================================
 time:
   - platform: homeassistant
     id: homeassistant_time
-    timezone: Europe/Paris  # ou votre timezone
+    timezone: Europe/Paris  # ⚠️ Adaptez à votre fuseau horaire
     on_time_sync:
       then:
         - logger.log: "Synchronized system clock"
 
+# =================================================================================================
+# CAPTEURS TEXTE / INFORMATIONS SYSTÈME
+# =================================================================================================
 text_sensor:
+  # Informations réseau WiFi
   - platform: wifi_info
     ip_address:
       name: "@ip"
@@ -92,9 +132,13 @@ text_sensor:
       name: "@mac"
       icon: mdi:ethernet
       id: device_mac
+  
+  # Version ESPHome
   - platform: version
     name: "Version"
     icon: mdi:chip
+  
+  # Heure formatée (depuis Home Assistant)
   - platform: template
     name: "HA time"
     icon: mdi:clock-outline
@@ -105,23 +149,8 @@ text_sensor:
       return  { str };
     update_interval: 30s
     entity_category: "diagnostic"
-  # - platform: template  ##### obsoléte ????
-  #   name: "Uptime calc"
-  #   icon: mdi:timer-outline
-  #   lambda: |-
-  #     int seconds = id(uptime_sensor).state;
-  #     int days = seconds / 86400;
-  #     seconds = seconds % 86400;
-  #     int hours = seconds / 3600;
-  #     seconds = seconds % 3600;
-  #     int minutes = seconds / 60;
-
-  #     // Renvoie la chaîne formatée
-  #     return (days > 0 ? std::to_string(days) + " jours " : "") + 
-  #            (hours > 0 ? std::to_string(hours) + " h " : "") +
-  #            (minutes > 0 ? std::to_string(minutes) + " min" : "0 min");
-  #   update_interval: 30s
-  #   entity_category: "diagnostic"
+  
+  # Uptime formaté (Durée depuis le dernier redémarrage)
   - platform: uptime
     name: "Uptime"
     icon: mdi:clock-fast
@@ -132,29 +161,36 @@ text_sensor:
       minutes: " mn "
       seconds: " s"
 
+# =================================================================================================
+# CAPTEURS BINAIRES (ON/OFF)
+# =================================================================================================
 binary_sensor:
+  # Statut de connexion à Home Assistant
   - platform: status
     name: "status"
     icon: mdi:check-network-outline
 
+# =================================================================================================
+# CAPTEURS NUMÉRIQUES (Diagnostic système)
+# =================================================================================================
 sensor:
-  # - platform: uptime  ##### utile ?
-  #   name: Uptime raw
-  #   icon: mdi:clock-start
-  #   id: uptime_sensor
-  #   update_interval: 15s
+  # Température interne de la puce ESP32
   - platform: internal_temperature
     name: "Interntemp"
     id: interntemp
     icon: mdi:thermometer
     update_interval: 30s
+  
+  # Signal WiFi (en dBm, valeur brute)
   - platform: wifi_signal
     name: "Wifi signal db"
     icon: mdi:wifi-strength-4
     id: wifi_signal_db
     update_interval: 60s
     entity_category: "diagnostic"
-  - platform: copy # Reports the WiFi signal strength in %
+  
+  # Signal WiFi (converti en pourcentage pour lisibilité)
+  - platform: copy
     source_id: wifi_signal_db
     name: "Wifi signal %"
     id: wifi_percent
@@ -164,42 +200,40 @@ sensor:
     unit_of_measurement: "%"
     entity_category: "diagnostic"
     device_class: ""
-#  - platform: template
-#    id: esp_memory
-#    icon: mdi:memory
-#    name: ESP Free Memory
-#    lambda: return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
-#    unit_of_measurement: 'kB'
-#    state_class: measurement
-#    entity_category: "diagnostic"
-#  - platform: template
-#    name: "ESP CPU Speed"
-#    id: esp_cpu
-#    accuracy_decimals: 0
-#    icon: mdi:cpu-32-bit
-#    unit_of_measurement: Mhz
-#    disabled_by_default: False
-#    lambda: |-
-#      return (id(cpu_speed));
-#    entity_category: "diagnostic"
-#    update_interval: 10s
-#  - platform: debug
-#    free:
-#      name: "Heap Free"
-#      icon: mdi:memory
-#    block:
-#      name: "Heap Max Block" 
-#      icon: mdi:memory
-#    loop_time:
-#      name: "Loop Time"
-#      icon: mdi:speedometer
 
+# =================================================================================================
+# BOUTONS (Actions manuelles)
+# =================================================================================================
 button:
+  # Redémarrage simple du module
   - platform: restart
     name: "Restart"
     icon: mdi:restart
+  
+  # Réinitialisation complète (efface toutes les configurations stockées)
   - platform: factory_reset
     name: "Factory reset"
     id: "factory_reset_button"
     icon: mdi:factory
-#    id: factory_reset_btn
+
+# =================================================================================================
+# MODE DEBUG (optionnel, décommenter si besoin de diagnostic poussé)
+# =================================================================================================
+debug:
+  update_interval: 5s
+
+# -------------------------------------------------------------------------------------------------
+# 📝 NOTES IMPORTANTES :
+# -------------------------------------------------------------------------------------------------
+# 1. **Secrets**       : Ne commitez JAMAIS le fichier `secrets.yaml` dans git !
+#                        Ajoutez `secrets.yaml` dans votre `.gitignore`.
+#
+# 2. **IP Statique**   : Assurez-vous que l'IP choisie est en dehors de la plage DHCP
+#                        de votre routeur pour éviter les conflits.
+#
+# 3. **Gateway/DNS**   : Les valeurs 192.168.1.1 sont des exemples. Adaptez-les à
+#                        votre réseau (souvent .1, .254, ou .2 selon votre box).
+#
+# 4. **Sécurité**      : Ce fichier est conçu pour être partagé publiquement.
+#                        Toutes les données sensibles DOIVENT être dans secrets.yaml.
+# -------------------------------------------------------------------------------------------------

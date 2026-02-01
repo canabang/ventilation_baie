@@ -3,6 +3,15 @@
 Projet de gestion intelligente de ventilation pour baie de brassage, basé sur **ESPHome** et **Home Assistant**.
 Cette version V2 introduit une gestion bi-zone (Haut/Bas) indépendante pour optimiser le flux d'air et le refroidissement.
 
+![Aperçu Dashboard](docs/IMG_20260201_121203.jpg)
+
+## 💡 Pourquoi ce projet ?
+
+Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fixe 100%), soit pilotés manuellement. Ce projet automatise tout :
+- **Silencieux** : Les ventilateurs tournent au minimum nécessaire.
+- **Réactif** : Augmentation instantanée si la température grimpe.
+- **Sûr** : Mode Fail-Safe si une sonde lâche et Interlock en cas de canicule/surchauffe.
+
 ---
 
 ## ✨ Fonctionnalités Principales

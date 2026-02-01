@@ -5,14 +5,25 @@
 # Ne l'utilisez pas tel quel avec un !include si vous n'avez pas une structure adaptée.
 # =================================================================================================
 
+# =================================================================================================
+# 🔧 PRÉ-REQUIS (HACS)
+# =================================================================================================
+# Pour que ce dashboard fonctionne, vous devez avoir installé les cartes suivantes via HACS :
+# 1. Mushroom Cards
+# 2. Streamline Card
+# 3. Card Mod (pour les effets Glassmorphism et animations)
+# 4. Vertical Stack In Card (Optionnel, si vous voulez grouper les cartes)
+# =================================================================================================
+
 # -------------------------------------------------------------------------------------------------
 # 1️⃣ PARTIE TEMPLATES
 # -------------------------------------------------------------------------------------------------
-# COPIER le bloc ci-dessous (lignes 13 à 168) et COLLEZ-LE :
-# - Soit dans votre fichier `dashboard.yaml` principal, sous la clé `streamline_templates:`.
-# - Soit dans votre fichier de templates existant si vous en avez un.
+# COPIER le bloc `streamline_templates:` ci-dessous et COLLEZ-LE :
+# - Soit dans votre fichier `ui-lovelace.yaml` (si mode YAML).
+# - Soit via l'éditeur RAW de votre dashboard (Trois points -> Editeur de configuration).
 #
 # Ces templates définissent le style "Glassmorphism" et le comportement des cartes.
+# Note : Les noms se terminent par `_v2` pour éviter les conflits avec vos templates existants.
 # -------------------------------------------------------------------------------------------------
 streamline_templates:
   mushroom_attribute_card_v2:
@@ -211,16 +222,19 @@ streamline_templates:
 # -------------------------------------------------------------------------------------------------
 # 2️⃣ PARTIE VUE / DASHBOARD
 # -------------------------------------------------------------------------------------------------
-# Cette partie définit la VIEW complète avec le layout "Sections".
+# Cette partie définit une vue (tab) complète de type "Sections".
 #
 # MODE D'EMPLOI :
-# A. Si vous éditez en YAML complet (ui-lovelace.yaml ou dashboard.yaml) :
-#    - Copiez tout le bloc `views:` ci-dessous à la suite de vos autres vues.
+# A. Depuis l'interface Home Assistant (Mode UI) :
+#    - Créez une nouvelle vue (cliquez sur le petit "+" en haut).
+#    - Donnez-lui un nom (ex: "Ventilation").
+#    - Changez le type de vue de "Masonry" à "Sections".
+#    - Enregistrez.
+#    - Cliquez sur "Ajouter une carte" -> "Manuel".
+#    - Copiez-collez uniquement le contenu de la section `sections: - cards:` ci-dessous.
 #
-# B. Si vous utilisez l'éditeur graphique (UI) :
-#    - Créez un nouveau Dashboard, choisissez "Sections" comme type de vue.
-#    - Créez une carte "Manuelle" (YAML).
-#    - Copiez uniquement le contenu de `cards:` (l'intérieur de la section `sections`).
+# B. Via l'Editeur RAW (YAML) :
+#    - Copiez tout le bloc `views:` ci-dessous à la suite de vos autres vues.
 # -------------------------------------------------------------------------------------------------
 views:
   - title: Ventilation V2

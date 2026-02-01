@@ -1,3 +1,13 @@
+# =================================================================================================
+# 🌬️ VENTILATION BAIE V2 - Configuration ESPHome (Dual Zone)
+# =================================================================================================
+# Ce fichier configure un système de ventilation intelligent à 2 zones indépendantes :
+# - Ligne 1 (Zone Haute) : Ventilateurs + Capteur DHT22
+# - Ligne 2 (Zone Basse) : Ventilateurs + Capteur DHT22
+#
+# Fonctionnalités : Mode Auto (régulation température), Mode Boost, Fail-Safe, Interlock surchauffe
+# =================================================================================================
+
 substitutions:
   name: "esp-fan"
   friendly_name: "Ventilation Baie"
@@ -5,19 +15,26 @@ substitutions:
   board: esp32-s3-devkitc-1
   type: esp-idf
   loglevel: INFO
-  static_ip: 192.168.1.123 # <-- ADRESSE IP À DÉFINIR ICI
+  static_ip: 192.168.1.100  # ⚠️ Remplacez par l'IP souhaitée pour ce module
 
 packages:
   base: !include .base.yaml
 
-# Enable Home Assistant API
+# =================================================================================================
+# API HOME ASSISTANT
+# =================================================================================================
+# ⚠️ IMPORTANT : Lors de la création du "New Device", ESPHome génère une clé. 
+# Récupérez-la et remplacez la valeur ci-dessous. 
+# (Ou générez-en une avec la commande : esphome encryption-key)
 api:
   encryption:
-    key: "GXuwx9Eh7Jr9+Ftj90jDXDfkYIWw9fQ77Si5HCQ94m8="
+    key: "VOTRE_CLÉ_API_FOURNIE_PAR_ESPHOME=="
 
-# --- MATÉRIEL : SORTIES PWM (Haut & Bas) ---
+# =================================================================================================
+# MATÉRIEL : SORTIES PWM (Contrôle de vitesse des ventilateurs)
+# =================================================================================================
 output:
-  # Ligne 1 (Haut) - GPIO6
+  # PWM Ligne 1 (Zone Haute) - GPIO6
   - platform: ledc
     pin: GPIO6
     id: pwm_line_1
@@ -25,7 +42,7 @@ output:
     min_power: 0.0
     max_power: 1.0
 
-  # Ligne 2 (Bas) - GPIO35
+  # PWM Ligne 2 (Zone Basse) - GPIO35
   - platform: ledc
     pin: GPIO35
     id: pwm_line_2
@@ -33,9 +50,13 @@ output:
     min_power: 0.0
     max_power: 1.0
 
-# --- MATÉRIEL : CAPTEURS (RPM & Temp) ---
+# =================================================================================================
+# CAPTEURS : TACHYMÈTRES (RPM) ET DHT22 (Température/Humidité)
+# =================================================================================================
 sensor:
-  # Ligne 1 - Tachymètre (GPIO4)
+  # --- LIGNE 1 (Zone Haute) ---
+  
+  # Tachymètre Ligne 1 (GPIO4)
   - platform: pulse_counter
     pin: 
       number: GPIO4
@@ -43,10 +64,10 @@ sensor:
     name: "Vitesse Ligne 1"
     unit_of_measurement: 'RPM'
     id: speed_line_1
-    filters: [{lambda: return x / 2.0;}]
+    filters: [{lambda: return x / 2.0;}]  # Division par 2 (format signal tachymètre ventilateur)
     update_interval: 3s
   
-  # Ligne 1 - DHT22 (GPIO7)
+  # Capteur DHT22 Ligne 1 (GPIO7) - Température
   - platform: dht
     pin: GPIO7
     model: DHT22
@@ -54,10 +75,10 @@ sensor:
       name: "Température Ligne 1"
       id: temp_1
       on_value:
-        then: [script.execute: update_ventilation]
+        then: [script.execute: update_ventilation]  # Déclenche le recalcul à chaque nouvelle mesure
     update_interval: 5s
 
-  # Puissance Ventilateur L1 (%)
+  # Calcul de la puissance actuelle (%) Ligne 1
   - platform: template
     name: "Puissance Ventilateur L1"
     unit_of_measurement: "%"
@@ -67,7 +88,9 @@ sensor:
       return id(fan_1).state ? id(fan_1).speed : 0;
     update_interval: 5s
 
-  # Ligne 2 - Tachymètre (GPIO36)
+  # --- LIGNE 2 (Zone Basse) ---
+  
+  # Tachymètre Ligne 2 (GPIO36)
   - platform: pulse_counter
     pin: 
       number: GPIO36
@@ -78,7 +101,7 @@ sensor:
     filters: [{lambda: return x / 2.0;}]
     update_interval: 3s
 
-  # Ligne 2 - DHT22 (GPIO37)
+  # Capteur DHT22 Ligne 2 (GPIO37) - Température
   - platform: dht
     pin: GPIO37
     model: DHT22
@@ -89,7 +112,7 @@ sensor:
         then: [script.execute: update_ventilation]
     update_interval: 5s
 
-  # Puissance Ventilateur L2 (%)
+  # Calcul de la puissance actuelle (%) Ligne 2
   - platform: template
     name: "Puissance Ventilateur L2"
     unit_of_measurement: "%"
@@ -99,142 +122,102 @@ sensor:
       return id(fan_2).state ? id(fan_2).speed : 0;
     update_interval: 5s
 
-# --- CONFIGURATION VENTILATEURS ---
+# =================================================================================================
+# VENTILATEURS (Entités Fan pour Home Assistant)
+# =================================================================================================
 fan:
+  # Fan Ligne 1
   - platform: speed
+    id: fan_1
     output: pwm_line_1
     name: "Ventilateurs Ligne 1"
-    id: fan_1
-    speed_count: 100
+    speed_count: 100  # Résolution : 100 niveaux de vitesse (1-100%)
 
+  # Fan Ligne 2
   - platform: speed
+    id: fan_2
     output: pwm_line_2
     name: "Ventilateurs Ligne 2"
-    id: fan_2
     speed_count: 100
 
-# --- VARIABLES GLOBALES (Consignes Partagées) ---
+# =================================================================================================
+# RÉGLAGES UTILISATEUR (Numbers - Ajustables depuis Home Assistant)
+# =================================================================================================
 number:
-  # Consigne MIN (Partagée)
+  # Consigne température MIN (0% de vitesse)
   - platform: template
+    id: consigne_min
     name: "Consigne Temp Min"
-    id: global_temp_min
-    min_value: 15
-    max_value: 35
-    step: 1
-    unit_of_measurement: "°C"
-    mode: box
     icon: "mdi:thermometer-low"
     optimistic: true
-    restore_value: true
-    initial_value: 25
-    set_action:
-      then:
-        - lambda: 'id(global_temp_min).publish_state(x);'
-        - script.execute: update_ventilation
-
-  # Consigne MAX (Partagée)
-  - platform: template
-    name: "Consigne Temp Max"
-    id: global_temp_max
-    min_value: 25
-    max_value: 50
+    min_value: 20
+    max_value: 30
     step: 1
+    initial_value: 24  # ⚠️ Valeur par défaut personnalisable
+    restore_value: true
     unit_of_measurement: "°C"
-    mode: box
+    on_value:
+      then: [script.execute: update_ventilation]
+
+  # Consigne température MAX (100% de vitesse)
+  - platform: template
+    id: consigne_max
+    name: "Consigne Temp Max"
     icon: "mdi:thermometer-high"
     optimistic: true
+    min_value: 25
+    max_value: 40
+    step: 1
+    initial_value: 35  # ⚠️ Valeur par défaut personnalisable
     restore_value: true
-    initial_value: 35
-    set_action:
-      then:
-        - lambda: 'id(global_temp_max).publish_state(x);'
-        - script.execute: update_ventilation
+    unit_of_measurement: "°C"
+    on_value:
+      then: [script.execute: update_ventilation]
 
-  # Durée Boost
+  # Durée du mode Boost (en minutes)
   - platform: template
-    name: "Durée Boost"
     id: boost_duration
+    name: "Durée Boost"
+    icon: "mdi:timer"
+    optimistic: true
     min_value: 1
     max_value: 60
     step: 1
-    unit_of_measurement: "min"
-    mode: box
-    icon: "mdi:timer-outline"
-    optimistic: true
+    initial_value: 10  # ⚠️ Valeur par défaut: 10 minutes
     restore_value: true
-    initial_value: 10
-    
-  # --- SLIDERS MANUELS ---
-  - platform: template
-    name: "Vitesse Manuelle L1"
-    id: manual_speed_1
-    min_value: 0
-    max_value: 100
-    step: 5
-    unit_of_measurement: "%"
-    mode: slider
-    icon: "mdi:fan"
-    set_action:
-      then:
-        - lambda: 'id(auto_mode_1).turn_off();' # Coupe l'auto L1 uniquement
-        - if:
-            condition:
-              lambda: 'return x == 0;'
-            then:
-              - fan.turn_off: fan_1
-            else:
-              - fan.turn_on: 
-                  id: fan_1 
-                  speed: !lambda 'return int(x);'
-    lambda: "return id(fan_1).state ? id(fan_1).speed : 0;"
+    unit_of_measurement: "min"
 
-  - platform: template
-    name: "Vitesse Manuelle L2"
-    id: manual_speed_2
-    min_value: 0
-    max_value: 100
-    step: 5
-    unit_of_measurement: "%"
-    mode: slider
-    icon: "mdi:fan"
-    set_action:
-      then:
-        - lambda: 'id(auto_mode_2).turn_off();' # Coupe l'auto L2 uniquement
-        - if:
-            condition:
-              lambda: 'return x == 0;'
-            then:
-              - fan.turn_off: fan_2
-            else:
-              - fan.turn_on:
-                  id: fan_2
-                  speed: !lambda 'return int(x);'
-    lambda: "return id(fan_2).state ? id(fan_2).speed : 0;"
-
-# --- ALERTES SÉCURITÉ ---
+# =================================================================================================
+# ALERTES SÉCURITÉ (Binary Sensors)
+# =================================================================================================
 binary_sensor:
+  # Alerte si capteur DHT22 de la Ligne 1 ne répond plus
   - platform: template
     name: "Alerte Capteur L1"
     id: alert_l1
     device_class: problem
     icon: "mdi:alert-circle"
   
+  # Alerte si capteur DHT22 de la Ligne 2 ne répond plus
   - platform: template
     name: "Alerte Capteur L2"
     id: alert_l2
     device_class: problem
     icon: "mdi:alert-circle"
 
+  # Alerte Interlock : température critique dépassée (Max + 5°C)
   - platform: template
     name: "Alerte Surchauffe (Interlock)"
     id: alert_interlock
     device_class: heat
     icon: "mdi:fire-alert"
 
-# --- SWITCHES MODES ---
+# =================================================================================================
+# SWITCHES (Modes de fonctionnement)
+# =================================================================================================
 switch:
-  # BOOST GLOBAL
+  # --- MODE BOOST GLOBAL ---
+  # Force 100% de vitesse sur toutes les lignes pendant une durée définie
   - platform: template
     name: "Mode Boost"
     id: boost_mode
@@ -243,129 +226,217 @@ switch:
     turn_on_action:
       - logger.log: "🚀 BOOST ACTIF (Global)"
       - script.execute: update_ventilation # Le script appliquera 100%
-      - delay: !lambda 'return id(boost_duration).state * 60000;'
+      - delay: !lambda 'return id(boost_duration).state * 60000;'  # Conversion minutes → millisecondes
       - switch.turn_off: boost_mode
     turn_off_action:
       - logger.log: "Fin du Boost"
       - script.execute: update_ventilation
 
-  # Auto Mode Ligne 1
+  # --- MODE AUTO LIGNE 1 ---
+  # Active la régulation automatique selon la température (Ligne 1)
   - platform: template
     name: "Mode Auto Ligne 1"
     id: auto_mode_1
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_ON  # Activé par défaut au démarrage
     icon: "mdi:thermostat-auto"
     turn_on_action:
       - script.execute: update_ventilation
     turn_off_action:
       - logger.log: "Mode Auto L1 désactivé"
 
-  # Auto Mode Ligne 2
+  # --- MODE AUTO LIGNE 2 ---
+  # Active la régulation automatique selon la température (Ligne 2)
   - platform: template
     name: "Mode Auto Ligne 2"
     id: auto_mode_2
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_ON  # Activé par défaut au démarrage
     icon: "mdi:thermostat-auto"
     turn_on_action:
       - script.execute: update_ventilation
     turn_off_action:
       - logger.log: "Mode Auto L2 désactivé"
 
-# --- LOGIQUE INTELLIGENTE ---
+# =================================================================================================
+# LOGIQUE INTELLIGENTE (Scripts)
+# =================================================================================================
 script:
+  # --- SCRIPT PRINCIPAL : Mise à jour de la ventilation ---
+  # Appelé automatiquement à chaque changement de température ou de réglage
   - id: update_ventilation
-    mode: restart
+    mode: restart  # Redémarre le script si déjà en cours (évite les doublons)
     then:
+      - logger.log: "===== MAJ VENTILATION ====="
+      
+      # --- VÉRIFICATION STATE DES CAPTEURS DHT ---
       - lambda: |-
-          // 1. Gestion BOOST (Priorité Absolue)
+          // Ligne 1
+          if (std::isnan(id(temp_1).state)) {
+            ESP_LOGW("L1", "⚠️ Capteur DHT défaillant");
+            id(alert_l1).publish_state(true);
+          } else {
+            id(alert_l1).publish_state(false);
+          }
+          
+          // Ligne 2
+          if (std::isnan(id(temp_2).state)) {
+            ESP_LOGW("L2", "⚠️ Capteur DHT défaillant");
+            id(alert_l2).publish_state(true);
+          } else {
+            id(alert_l2).publish_state(false);
+          }
+
+      # --- CALCUL VITESSE LIGNE 1 ---
+      - lambda: |-
+          float speed = 0.0;
+          
+          // PRIORITÉ 1 : Boost Global
           if (id(boost_mode).state) {
-            id(fan_1).turn_on().set_speed(100).perform();
-            id(fan_2).turn_on().set_speed(100).perform();
-            return;
+            speed = 100.0;
+            ESP_LOGI("L1", "🚀 BOOST : 100%%");
           }
+          // PRIORITÉ 2 : Interlock Surchauffe
+          else if (id(alert_interlock).state) {
+            speed = 100.0;
+            ESP_LOGW("L1", "🔥 INTERLOCK : 100%%");
+          }
+          // PRIORITÉ 3 : Fail-Safe (Capteur HS)
+          else if (id(alert_l1).state) {
+            speed = 50.0;
+            ESP_LOGW("L1", "⚠️ FAIL-SAFE : 50%% (capteur défaillant)");
+          }
+          // MODE AUTO (si activé)
+          else if (id(auto_mode_1).state) {
+            float temp = id(temp_1).state;
+            float t_min = id(consigne_min).state;
+            float t_max = id(consigne_max).state;
+            
+            // Calcul linéaire : 0% à t_min, 100% à t_max
+            speed = ((temp - t_min) / (t_max - t_min)) * 100.0;
+            speed = max(0.0f, min(100.0f, speed));  // Clamp entre 0 et 100
+            
+            ESP_LOGI("L1", "Auto : %.1f°C → %.0f%%", temp, speed);
+          }
+          // MODE MANUEL (garde l'état actuel)
+          else {
+            speed = id(fan_1).speed;
+            ESP_LOGI("L1", "Manuel : %.0f%%", speed);
+          }
+          
+          // Application avec Kickstart si besoin
+          auto call = id(fan_1).make_call();
+          if (speed == 0.0) {
+            call.set_state(false);  // Éteindre si 0%
+          } else {
+            call.set_state(true);
+            
+            // KICKSTART : Impulsion 100% pendant 1 sec pour lancer le ventilateur
+            if (speed < 30.0 && !id(fan_1).state) {
+              ESP_LOGI("L1", "⚡ Kickstart (bas régime)...");
+              auto kick = id(fan_1).make_call();
+              kick.set_state(true);
+              kick.set_speed(100);
+              kick.perform();
+              delay(1000);  // Pause 1 seconde
+            }
+            
+            call.set_speed((int)speed);
+          }
+          call.perform();
 
-          // Variables Températures
-          float t1 = id(temp_1).state;
-          float t2 = id(temp_2).state;
-          bool t1_valid = !std::isnan(t1);
-          bool t2_valid = !std::isnan(t2);
+      # --- CALCUL VITESSE LIGNE 2 (Identique à L1) ---
+      - lambda: |-
+          float speed = 0.0;
+          
+          if (id(boost_mode).state) {
+            speed = 100.0;
+            ESP_LOGI("L2", "🚀 BOOST : 100%%");
+          }
+          else if (id(alert_interlock).state) {
+            speed = 100.0;
+            ESP_LOGW("L2", "🔥 INTERLOCK : 100%%");
+          }
+          else if (id(alert_l2).state) {
+            speed = 50.0;
+            ESP_LOGW("L2", "⚠️ FAIL-SAFE : 50%% (capteur défaillant)");
+          }
+          else if (id(auto_mode_2).state) {
+            float temp = id(temp_2).state;
+            float t_min = id(consigne_min).state;
+            float t_max = id(consigne_max).state;
+            
+            speed = ((temp - t_min) / (t_max - t_min)) * 100.0;
+            speed = max(0.0f, min(100.0f, speed));
+            
+            ESP_LOGI("L2", "Auto : %.1f°C → %.0f%%", temp, speed);
+          }
+          else {
+            speed = id(fan_2).speed;
+            ESP_LOGI("L2", "Manuel : %.0f%%", speed);
+          }
+          
+          auto call = id(fan_2).make_call();
+          if (speed == 0.0) {
+            call.set_state(false);
+          } else {
+            call.set_state(true);
+            
+            if (speed < 30.0 && !id(fan_2).state) {
+              ESP_LOGI("L2", "⚡ Kickstart (bas régime)...");
+              auto kick = id(fan_2).make_call();
+              kick.set_state(true);
+              kick.set_speed(100);
+              kick.perform();
+              delay(1000);
+            }
+            
+            call.set_speed((int)speed);
+          }
+          call.perform();
 
-          // Variables Consignes
-          float t_min = id(global_temp_min).state;
-          float t_max = id(global_temp_max).state;
-          float t_crit = t_max + 5.0; // Interlock dynamique
+      # --- SURVEILLANCE INTERLOCK (Surchauffe critique) ---
+      - lambda: |-
+          float t_crit = id(consigne_max).state + 5.0;  // Seuil = Max + 5°C
           bool interlock = false;
-
-          // 2. Gestion INTERLOCK (Surchauffe Critique)
-          // Si l'une des zones dépasse le seuil critique, tout à fond !
-          if ((t1_valid && t1 >= t_crit) || (t2_valid && t2 >= t_crit)) {
+          
+          if (!std::isnan(id(temp_1).state) && id(temp_1).state >= t_crit) {
             interlock = true;
+            ESP_LOGW("INTERLOCK", "⚠️ L1 : %.1f°C >= %.1f°C", id(temp_1).state, t_crit);
           }
+          if (!std::isnan(id(temp_2).state) && id(temp_2).state >= t_crit) {
+            interlock = true;
+            ESP_LOGW("INTERLOCK", "⚠️ L2 : %.1f°C >= %.1f°C", id(temp_2).state, t_crit);
+          }
+          
           id(alert_interlock).publish_state(interlock);
-
+          
           if (interlock) {
-            ESP_LOGW("safety", "SURCHAUFFE CRITIQUE ! Activation Interlock (100%)");
-            id(fan_1).turn_on().set_speed(100).perform();
-            id(fan_2).turn_on().set_speed(100).perform();
-            return;
+            ESP_LOGE("INTERLOCK", "🔥 SURCHAUFFE CRITIQUE : Ventilation forcée à 100%%");
           }
 
-          // 3. Calcul LIGNE 1
-          if (id(auto_mode_1).state) {
-            int speed1 = 0;
-            if (!t1_valid) {
-              // Fail-Safe L1
-              speed1 = 50; 
-              id(alert_l1).publish_state(true);
-              ESP_LOGW("safety", "Erreur Capteur L1 -> Fail-Safe 50%");
-            } else {
-              id(alert_l1).publish_state(false);
-              // Courbe Linéaire L1
-              if (t1 < t_min) speed1 = 0;
-              else if (t1 >= t_max) speed1 = 100;
-              else speed1 = (int)(((t1 - t_min) / (t_max - t_min)) * 100);
-            }
+# =================================================================================================
+# INTERVALLES DE MISE À JOUR
+# =================================================================================================
+interval:
+  # Déclenche un recalcul toutes les 30 secondes (sécurité)
+  - interval: 30s
+    then:
+      - script.execute: update_ventilation
 
-            // Application L1 (avec Kickstart si démarrage)
-            if (speed1 == 0) {
-              if (id(fan_1).state) id(fan_1).turn_off().perform();
-            } else {
-              if (!id(fan_1).state) { 
-                // Kickstart
-                id(fan_1).turn_on().set_speed(50).perform();
-                delay(1000); 
-              }
-              id(fan_1).turn_on().set_speed(speed1).perform();
-            }
-          }
-
-          // 4. Calcul LIGNE 2
-          if (id(auto_mode_2).state) {
-            int speed2 = 0;
-            if (!t2_valid) {
-              // Fail-Safe L2
-              speed2 = 50;
-              id(alert_l2).publish_state(true);
-              ESP_LOGW("safety", "Erreur Capteur L2 -> Fail-Safe 50%");
-            } else {
-              id(alert_l2).publish_state(false);
-              // Courbe Linéaire L2
-              if (t2 < t_min) speed2 = 0;
-              else if (t2 >= t_max) speed2 = 100;
-              else speed2 = (int)(((t2 - t_min) / (t_max - t_min)) * 100);
-            }
-
-            // Application L2 (avec Kickstart si démarrage)
-            if (speed2 == 0) {
-              if (id(fan_2).state) id(fan_2).turn_off().perform();
-            } else {
-              if (!id(fan_2).state) {
-                 // Kickstart
-                 id(fan_2).turn_on().set_speed(50).perform();
-                 delay(1000);
-              }
-              id(fan_2).turn_on().set_speed(speed2).perform();
-            }
-          }
+# =================================================================================================
+# 📝 NOTES TECHNIQUES
+# =================================================================================================
+# 1. **PWM** : Les ventilateurs PWM ne tournent généralement pas en dessous de 5% de puissance
+#              (caractéristique matérielle normale).
+#
+# 2. **Kickstart** : Impulsion 100% pendant 1 seconde en dessous de 30% pour garantir le démarrage
+#                    des moteurs (évite les calages à bas régime).
+#
+# 3. **Fail-Safe** : Si un capteur DHT22 ne répond plus (NaN), la ligne passe à 50% par sécurité.
+#
+# 4. **Interlock** : Si la température dépasse le seuil critique (Max + 5°C), toutes les lignes
+#                    passent à 100% pour évacuer la chaleur (priorité absolue).
+#
+# 5. **Priorités** : Boost > Interlock > Fail-Safe > Mode Auto > Mode Manuel
+# =================================================================================================
