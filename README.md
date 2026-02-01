@@ -1,41 +1,45 @@
-# 🌬️ Projet Ventilation Baie Automatisée
+# 🌬️ Ventilation Baie de Brassage (V2 - Dual Zone)
 
-Ce projet vise à créer un système de refroidissement intelligent pour une baie informatique (ou tout autre boîtier nécessitant une extraction d'air). Il utilise un ESP32-S3 pour réguler la vitesse de ventilateurs industriels (PWM) en fonction de la température ambiante mesurée par des capteurs DHT22.
+Projet de gestion intelligente de ventilation pour baie de brassage, basé sur **ESPHome** et **Home Assistant**.
+Cette version V2 introduit une gestion bi-zone (Haut/Bas) indépendante pour optimiser le flux d'air et le refroidissement.
 
-## 🚀 Fonctionnalités Clés
+---
 
-- **Courbe Linéaire Intelligente** : La vitesse s'adapte progressivement entre deux seuils de température pour un silence optimal.
-- **Réglage Dynamique** : Modifiez les seuils de température (Min/Max) directement depuis Home Assistant sans reflasher.
-- **Mode Boost** : Un bouton pour forcer les ventilateurs à 100% pendant une durée réglable (1-60 min).
-- **Priorité Manuelle** : Le mode automatique se désactive instantanément dès que vous réglez la vitesse manuellement.
-- **Tableau de Bord Complet** : Suivi des RPM, de la température CPU de l'ESP32, de la température ambiante et de la puissance (%) envoyée.
+## ✨ Fonctionnalités Principales
 
-## 🛠️ Matériel Requis
+*   **⚡ Dual Zone (Haut / Bas)** : Pilotage indépendant de deux rangées de ventilateurs.
+*   **🌡️ Mode Automatique Intelligent** :
+    *   Régulation PID simplifiée (courbe linéaire) basée sur la température de chaque zone.
+    *   **Kickstart** : Impulsion de démarrage pour assurer la rotation des ventilateurs à basse vitesse.
+*   **🚀 Mode Boost Global** : "Tout à fond" pendant une durée configurable (ex: 10 min) en un clic.
+*   **🛡️ Sécurités Actives (Fail-Safe)** :
+    *   **Perte de Sonde** : Si un capteur ne répond plus, la ligne concernée passe à 50% par sécurité.
+    *   **Interlock Surchauffe** : Si la T° dépasse le seuil critique (`Max + 5°C`), toutes les lignes passent à 100%.
+    *   **Indicateur RPM** : Surveillance de la vitesse réelle des ventilateurs.
 
-| Composant | Détails |
-| :--- | :--- |
-| **Microcontrôleur** | ESP32-S3 (ex: DevKitC-1) |
-| **Ventilateurs** | Arctic P12 Pro PWM (Signal PWM 25kHz) |
-| **Capteurs** | DHT22 (Température) |
-| **Alimentation** | 12V (Ventilateurs) + 5V (ESP32) |
+---
 
-## 📂 Structure du Dépôt
+## 📂 Structure du Projet
 
-- `ventilation_v1.yaml` : Version actuelle avec courbe linéaire et seuils dynamiques.
-- `ventilation_v2.yaml` : Préparation pour la gestion bi-zone (2 lignes indépendantes).
-- `TUTORIAL.md` : Guide complet d'installation et de configuration.
-- `secrets.yaml.example` : Modèle pour vos identifiants WiFi.
+*   **`ventilation_v2.yaml`** : Configuration principale ESPHome (Code source à flasher).
+*   **`.base.yaml`** : Configuration commune (WiFi, API, OTA).
+*   **`ventilation_card.yaml`** : Code YAML complet pour le dashboard Home Assistant (Templates + Vue).
+*   **`TUTORIAL.md`** : Guide pas à pas pour le câblage et l'installation.
 
-## ⚙️ Installation Rapide
+---
 
-1. Installez [ESPHome](https://esphome.io/).
-2. Créez votre fichier `secrets.yaml` (voir `TUTORIAL.md`).
-3. Flashez : `esphome run ventilation_v1.yaml`.
+## 🚀 Installation Rapide
 
-## 📈 Roadmap
+1.  **Câblage** : Suivez le guide [TUTORIAL.md](./TUTORIAL.md).
+2.  **Flashage** : Copiez les fichiers YAML dans votre dossier ESPHome et flashez votre ESP32.
+3.  **Dashboard** : Copiez le contenu de `ventilation_card.yaml` dans une vue "Sections" de votre Home Assistant.
 
-- [x] Phase 1 : Pilotage PWM et tachymètre.
-- [x] Phase 2 : Automatisation par paliers.
-- [x] Phase 3 : Courbe linéaire et seuils dynamiques via HA.
-- [ ] Phase 4 : Extension bi-zone (V2).
-- [ ] Phase 5 : Boîtier de contrôle sur mesure.
+---
+
+## 🔧 Configuration par défaut
+
+*   **Consigne Min** : 25°C (0% de vitesse)
+*   **Consigne Max** : 35°C (100% de vitesse)
+*   **Durée Boost** : 10 minutes
+
+*Ces valeurs sont ajustables directement depuis le dashboard.*

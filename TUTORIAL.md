@@ -1,72 +1,80 @@
-# 📔 Tutoriel : Mise en place du Système de Ventilation
+# 📚 Tutoriel d'Installation : Ventilation Baie de Brassage (V2 - Dual Zone)
 
-Ce guide vous accompagne pas à pas dans l'installation et la configuration de votre système de refroidissement intelligent.
+Ce guide détaille l'installation de la version **V2 (Dual Zone)** du système de ventilation. Cette version permet de piloter **deux lignes de ventilateurs indépendantes** (Haut et Bas) pour refroidir efficacement votre équipement (Mini PCs, Switchs, etc.).
 
-## 1. Schémas de Câblage
+---
 
-### Vue d'ensemble (Projet Complet)
-Ce schéma illustre le câblage série (PST) pour les deux rampes :
+## � Aperçu du Projet
 
-![Schéma Complet](docs/wiring_diagram.png)
+**L'objectif** : Refroidir la zone des équipements (Mini PCs ci-dessous) grâce à un montage piloté.
 
-### Détail Connecteur Ventilateur
-Référez-vous aux numéros de broches sur le connecteur de votre ventilateur :
+![Zone à refroidir (Baie / Mini PCs)](docs/IMG_20260201_121634.jpg)
 
-![Câblage ventilateur 4-pins](docs/fan_pinout.png)
+---
 
-| Broche | Fonction | Destination ESP32 / Alim | Note |
+## �🛠️ Matériel Requis
+
+*   **ESP32** (Modèle S3 ou standard)
+*   **Ventilateurs PWM** : ARCTIC P14 Pro PST(4 fils standard)
+*   **Alimentation 12V** Dédiée ventilateurs
+*   **Capteurs de Température DHT22** (x2)
+
+---
+
+## ⚡ Schéma de Câblage (V2)
+
+Voici le schéma global de principe pour le raccordement de l'ESP32 avec les deux lignes de ventilateurs.
+
+![Schéma de câblage global](docs/wiring_diagram.png)
+
+### 1. Alimentation
+*   **ESP32** : Via USB ou Vin (5V)
+*   **Ventilateurs** : Raccordez le **GND** et le **12V** directement à l'alimentation externe.
+    *   ⚠️ **IMPORTANT** : Reliez le GND de l'alim 12V au GND de l'ESP32 (masse commune).
+
+### 2. Ventilateurs (Pinout)
+
+Référez-vous à l'image ci-dessous pour identifier les câbles de vos connecteurs ventilateurs standards (PWM).
+
+![Pinout Ventilateur PWM](docs/fan_pinout.png)
+
+**Raccordement sur l'ESP32 :**
+
+| Composant | Fil Ventilateur | Pin ESP32 | Fonction |
 | :--- | :--- | :--- | :--- |
-| **1** | **Ground (GND)** | **GND** (Commun) | Masse |
-| **2** | **VCC (12V)** | **+12V** (Alim externe) | Alimentation |
-| **3** | **Signal (Tacho)** | **GPIO4** | Lecture RPM |
-| **4** | **PWM** | **GPIO6** | Contrôle vitesse |
+| **Ligne 1 (Haut)** | PWM (Bleu) | **GPIO 6** | Contrôle Vitesse |
+| | Tach (Vert/Jaune) | **GPIO 4** | Retour Vitesse (RPM) |
+| **Ligne 2 (Bas)** | PWM (Bleu) | **GPIO 35** | Contrôle Vitesse |
+| | Tach (Vert/Jaune) | **GPIO 36** | Retour Vitesse (RPM) |
 
-> [!CAUTION]
-> N'oubliez pas de relier le **GND** de votre alimentation 12V au **GND** de l'ESP32 pour que le signal PWM fonctionne.
+### 3. Capteurs de Température (DHT22)
 
-## 2. Configuration logicielle
+| Composant | Pin DHT22 | Pin ESP32 |
+| :--- | :--- | :--- |
+| **DHT Ligne 1** | DATA | **GPIO 7** |
+| **DHT Ligne 2** | DATA | **GPIO 37** |
 
-### Préparation des secrets
-À la racine du projet, créez un fichier `secrets.yaml` :
-```yaml
-wifi_ssid: "VOTRE_WIFI"
-wifi_password: "VOTRE_MOT_DE_PASSE"
-```
+---
 
-### Flashage
-Connectez votre ESP32 en USB et lancez la commande suivante :
-```bash
-esphome run ventilation_v1.yaml
-```
+## 🧪 Validation & Tests (Banc d'essai)
 
-## 3. Intégration Home Assistant
+Avant l'installation finale dans la baie, il est recommandé de valider le montage "sur table" comme ci-dessous. Cela permet de vérifier que les RPM remontent bien et que les sondes réagissent.
 
-Une fois flashé, ESPHome sera automatiquement détecté par Home Assistant.
+![Montage sur table (Test)](docs/IMG_20260201_121203.jpg)
 
-### Configuration de la Carte (Dashboard)
-Pour un contrôle optimal, ajoutez ces éléments à votre tableau de bord :
+### Check-list de vérification :
+1.  **RPM** : Faites tourner les ventilateurs à la main, la valeur doit s'afficher dans HA.
+2.  **Température** : Soufflez sur les capteurs, la courbe doit monter.
+3.  **Commandes** : Testez le Slider Manuel et le Boost.
 
-1.  **Contrôle Auto** : `switch.mode_automatique`
-2.  **Réglage Temp Min** : `number.consigne_temp_min` (Définit quand le ventilateur démarre)
-3.  **Réglage Temp Max** : `number.consigne_temp_max` (Définit quand il atteint 100%)
-4.  **Afficheurs** : 
-    - `sensor.vitesse_ventilateur` (RPM)
-    - `sensor.puissance_ventilateur` (%)
-    - `sensor.temperature_ambiante` (°C)
+---
 
-### 🚀 Mode Boost (Nouveau)
-Le bouton **Mode Boost** permet de forcer instantanément tous les ventilateurs à 100% (utile si vous installez un nouveau logiciel ou si la baie chauffe anormalement).
-- **Durée Boost** : Réglez le curseur "Durée Boost" (ex: 10 min).
-- **Activation** : Actionnez "Mode Boost". Le ventilateur passera à 100% et le switch s'éteindra automatiquement à la fin du décompte.
-- **Retour Auto** : À la fin de la durée, le système repasse automatiquement en mode courbe automatique (ou manuel selon l'état précédent).
+## 💻 Installation Logicielle
 
-### Exemple de comportement
-Si vous réglez **Min = 25°C** et **Max = 35°C** :
-- À **24°C** : Ventilateur **éteint**.
-- À **30°C** : Ventilateur à **50%** (milieu de courbe).
-- À **36°C** : Ventilateur à **100%**.
+1.  **Fichiers YAML** :
+    *   Assurez-vous que `ventilation_v2.yaml` et `.base.yaml` sont dans votre dossier ESPHome.
+    *   Vérifiez l'adresse IP statique dans `ventilation_v2.yaml`.
 
-## 🧠 Astuces
-
-- **Mode Manuel** : Dès que vous bougez le curseur de vitesse manuelle, le mode automatique se désactive pour vous laisser la main.
-- **Vérification** : Consultez les logs ESPHome pour voir la ligne `Mode AUTO - Température: XX°C -> Ventilateur: XX%` s'afficher toutes les 30 secondes.
+2.  **Dashboard** :
+    *   Utilisez le fichier **`ventilation_card.yaml`** fourni.
+    *   Copiez les *templates* et la configuration de la vue *Sections*.

@@ -1,0 +1,296 @@
+streamline_templates:
+  mushroom_attribute_card:
+    default:
+      - attribute: state
+      - icon: mdi:information
+      - unit: ''
+    card:
+      type: custom:mushroom-template-card
+      primary: '[[name]]'
+      secondary: |-
+        {% if '[[attribute]]' == 'state' %}
+        {{ states('[[entity]]') | float | round(0) }} [[unit]]
+        {% else %}
+        {{ state_attr('[[entity]]', '[[attribute]]') }}
+        {% endif %}
+      icon: '[[icon]]'
+      icon_color: blue
+      tap_action:
+        action: more-info
+      card_mod:
+        style: |
+          ha-card {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+            border-radius: 20px !important;
+            transition: all 0.3s ease !important;
+          }
+  mushroom_switch_card:
+    default:
+      - icon: mdi:power
+      - secondary: '{{ ''Allumé'' if is_state(''[[entity]]'', ''on'') else ''Éteint'' }}'
+      - badge_icon: ''
+      - color_on: seagreen
+      - color_off: grey
+      - show_power: false
+    card:
+      type: custom:mushroom-template-card
+      primary: '[[name]]'
+      secondary: '[[secondary]]'
+      icon: '[[icon]]'
+      icon_color: |-
+        {% if is_state('[[entity]]', 'on') %}
+          [[color_on]]
+        {% else %}
+          [[color_off]]
+        {% endif %}
+      entity: '[[entity]]'
+      layout: horizontal
+      tap_action:
+        action: call-service
+        service: switch.toggle
+        target:
+          entity_id: '[[entity]]'
+      card_mod:
+        style: |
+          ha-card {
+            --ha-card-border-radius: 20px;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+            height: 56px !important;
+          }
+  mushroom_temperature_card:
+    default:
+      - badge_icon: ''
+      - battery_entity: ''
+    card:
+      type: custom:mushroom-template-card
+      primary: '[[name]]'
+      secondary: '{{ states(''[[entity]]'') | float | round(1) }}°C'
+      icon: mdi:thermometer
+      icon_color: |-
+        {% set temp = states('[[entity]]') | float %}
+        {% if temp >= 23 %}
+          red
+        {% elif temp >= 19 %}
+          seagreen
+        {% else %}
+          blue
+        {% endif %}
+      entity: '[[entity]]'
+      card_mod:
+        style: |
+          ha-card {
+            --ha-card-border-radius: 20px;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+          }
+  mushroom_fan_card:
+    default:
+      - icon_animation: false
+    card:
+      type: custom:mushroom-fan-card
+      entity: '[[entity]]'
+      name: '[[name]]'
+      icon_animation: '[[icon_animation]]'
+      show_percentage_control: true
+      show_oscillate_control: false
+      collapsible_controls: true
+      fill_container: false
+      tap_action:
+        action: toggle
+      hold_action:
+        action: more-info
+      card_mod:
+        style: |
+          ha-card {
+            --ha-card-border-radius: 25px;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          ha-card:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+          }
+  mushroom_number_buttons:
+    default:
+      - icon: mdi:numeric
+    card:
+      type: custom:mushroom-number-card
+      entity: '[[entity]]'
+      name: '[[name]]'
+      icon: '[[icon]]'
+      display_mode: buttons
+      icon_color: blue
+      layout: horizontal
+      tap_action:
+        action: more-info
+      card_mod:
+        style: |
+          ha-card {
+            --ha-card-border-radius: 20px;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+            height: 56px !important;
+            --mush-control-height: 32px;
+            --mush-card-primary-font-size: 12px;
+            --mush-card-secondary-font-size: 10px;
+          }
+views:
+  - title: Ventilation V2
+    type: sections
+    cards: []
+    sections:
+      - type: grid
+        cards:
+          - type: custom:vertical-stack-in-card
+            cards:
+              - type: custom:mushroom-title-card
+                title: Paramètres Globaux
+              - type: custom:streamline-card
+                template: mushroom_attribute_card
+                variables:
+                  - name: System Alert
+                  - icon: mdi:alert-circle
+                  - entity: binary_sensor.esp_fan_alerte_surchauffe_interlock
+                  - attribute: state
+                card_mod:
+                  style: |
+                    ha-card { 
+                      border: none !important; box-shadow: none !important; 
+                      display: {{ 'none' if is_state('binary_sensor.esp_fan_alerte_surchauffe_interlock', 'off') else 'block' }};
+                    }
+              - square: false
+                type: grid
+                columns: 2
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_switch_card
+                    variables:
+                      name: Boost
+                      entity: switch.esp_fan_mode_boost
+                      icon: mdi:rocket-launch
+                      color_on: red
+                  - type: custom:streamline-card
+                    template: mushroom_number_buttons
+                    variables:
+                      name: Durée
+                      entity: number.esp_fan_duree_boost
+                      icon: mdi:timer-sand
+              - type: grid
+                columns: 2
+                square: false
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_number_buttons
+                    variables:
+                      name: Min
+                      entity: number.esp_fan_consigne_temp_min
+                      icon: mdi:thermometer-low
+                  - type: custom:streamline-card
+                    template: mushroom_number_buttons
+                    variables:
+                      - name: Max
+                      - entity: number.esp_fan_consigne_temp_max
+                      - icon: mdi:thermometer-high
+          - type: custom:vertical-stack-in-card
+            cards:
+              - type: custom:mushroom-title-card
+                title: Ligne 1
+              - type: grid
+                columns: 2
+                square: false
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_fan_card
+                    variables:
+                      - name: Ventilateur
+                      - entity: fan.esp_fan_ventilateurs_ligne_1
+                      - icon_animation: true
+                  - type: custom:streamline-card
+                    template: mushroom_switch_card
+                    variables:
+                      - name: Auto
+                      - entity: switch.esp_fan_mode_auto_ligne_1
+                      - icon: mdi:robot
+                      - color_on: blue
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_temperature_card
+                    variables:
+                      - name: Temp
+                      - entity: sensor.esp_fan_temperature_ligne_1
+                  - type: custom:streamline-card
+                    template: mushroom_attribute_card
+                    variables:
+                      - name: RPM
+                      - entity: sensor.esp_fan_vitesse_ligne_1
+                      - icon: mdi:speedometer
+                      - unit: RPM
+                  - type: custom:streamline-card
+                    template: mushroom_attribute_card
+                    variables:
+                      - name: Puis.
+                      - entity: sensor.esp_fan_puissance_ventilateur_l1
+                      - icon: mdi:percent
+                      - unit: '%'
+          - type: custom:vertical-stack-in-card
+            cards:
+              - type: custom:mushroom-title-card
+                title: Ligne 2
+              - type: grid
+                columns: 2
+                square: false
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_fan_card
+                    variables:
+                      - name: Ventilateur
+                      - entity: fan.esp_fan_ventilateurs_ligne_2
+                      - icon_animation: true
+                  - type: custom:streamline-card
+                    template: mushroom_switch_card
+                    variables:
+                      - name: Auto
+                      - entity: switch.esp_fan_mode_auto_ligne_2
+                      - icon: mdi:robot
+                      - color_on: blue
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:streamline-card
+                    template: mushroom_temperature_card
+                    variables:
+                      - name: Temp
+                      - entity: sensor.esp_fan_temperature_ligne_2
+                  - type: custom:streamline-card
+                    template: mushroom_attribute_card
+                    variables:
+                      - name: RPM
+                      - entity: sensor.esp_fan_vitesse_ligne_2
+                      - icon: mdi:speedometer
+                      - unit: RPM
+                  - type: custom:streamline-card
+                    template: mushroom_attribute_card
+                    variables:
+                      - name: Puis.
+                      - entity: sensor.esp_fan_puissance_ventilateur_l2
+                      - icon: mdi:percent
+                      - unit: '%'
+        column_span: 3
+    max_columns: 3
