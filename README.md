@@ -36,6 +36,7 @@ Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fix
 *   **`ventilation_v2.yaml`** : Configuration principale ESPHome (Code source à flasher).
 *   **`.base.yaml`** : Configuration commune (WiFi, API, OTA).
 *   **`ventilation_card.yaml`** : Code YAML complet pour le dashboard Home Assistant (Templates + Vue).
+*   **`recorder.yaml`** : Configuration recommandée pour l'historique Home Assistant.
 *   **`TUTORIAL.md`** : Guide pas à pas pour le câblage et l'installation.
 
 ---

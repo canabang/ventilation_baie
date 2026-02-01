@@ -1,0 +1,26 @@
+# =================================================================================================
+# 📊 CONFIGURATION RECORDER (Home Assistant)
+# =================================================================================================
+# Pour conserver l'historique de vos capteurs et voir les graphiques dans Home Assistant,
+# nous vous conseillons d'ajouter ces entités à votre configuration `recorder:`.
+# 
+# Si vous utilisez déjà un fichier `recorder.yaml`, ajoutez ces lignes dans `include: entities:`.
+# Sinon, ajoutez ce bloc dans votre `configuration.yaml`.
+# =================================================================================================
+
+recorder:
+  include:
+    entities:
+      # Ligne 1
+      - sensor.esp_fan_temperature_ligne_1
+      - sensor.esp_fan_vitesse_ligne_1
+      - sensor.esp_fan_puissance_ventilateur_l1
+      
+      # Ligne 2
+      - sensor.esp_fan_temperature_ligne_2
+      - sensor.esp_fan_vitesse_ligne_2
+      - sensor.esp_fan_puissance_ventilateur_l2
+      
+      # Paramètres
+      - number.esp_fan_consigne_temp_min
+      - number.esp_fan_consigne_temp_max
