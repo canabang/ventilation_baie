@@ -2,8 +2,14 @@
 
 Ce guide vous accompagne pas à pas dans l'installation et la configuration de votre système de refroidissement intelligent.
 
-## 1. Câblage (ESP32-S3)
+## 1. Schémas de Câblage
 
+### Vue d'ensemble (Projet Complet)
+Ce schéma illustre le câblage série (PST) pour les deux rampes :
+
+![Schéma Complet](docs/wiring_diagram.png)
+
+### Détail Connecteur Ventilateur
 Référez-vous aux numéros de broches sur le connecteur de votre ventilateur :
 
 ![Câblage ventilateur 4-pins](docs/fan_pinout.png)
