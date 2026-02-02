@@ -40,6 +40,7 @@ Les ventilateurs de baie classiques sont souvent soit trop bruyants (vitesse fix
 *   **`.base.yaml`** : Configuration commune (WiFi, API, OTA).
 *   **`ventilation_card.yaml`** : Code YAML complet pour le dashboard Home Assistant (Templates + Vue).
 *   **`debug_cards.yaml`** : Cartes ApexCharts pour le debug et l'analyse système.
+*   **`ha_configuration/`** : Dossier contenant les templates de puissance et capteurs d'énergie pour HA.
 *   **`recorder.yaml`** : Configuration recommandée pour l'historique Home Assistant.
 *   **`TUTORIAL.md`** : Guide pas à pas pour le câblage et l'installation.
 

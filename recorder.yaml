@@ -24,3 +24,11 @@ recorder:
       # Paramètres
       - number.esp_fan_consigne_temp_min
       - number.esp_fan_consigne_temp_max
+      
+      # Consommation & Énergie
+      - sensor.puissance_ventilation_ligne_1
+      - sensor.puissance_ventilation_ligne_2
+      - sensor.energie_ventilation_ligne_1
+      - sensor.energie_ventilation_ligne_2
+      - sensor.energie_ventilation_ligne_2_cost
+      - sensor.energie_ventilation_ligne_1_cost

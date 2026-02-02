@@ -1,0 +1,27 @@
+# =================================================================================================
+# 📊 ESTIMATION DE PUISSANCE (HA Template)
+# =================================================================================================
+# À placer dans votre dossier de templates (ex: /config/templates/power_ventilation.yaml)
+# Inclus via : template: !include_dir_merge_list templates/
+# =================================================================================================
+
+- sensor:
+    # Ligne 1 (Bas) : (Puissance % * 2.88W) + 0.5W (Part ESP)
+    - name: "Puissance Ventilation Ligne 1"
+      unique_id: ventil_baie_power_l1
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      state: >
+        {% set p = states('sensor.esp_fan_puissance_ventilateur_l1') | float(0) %}
+        {{ ( ((p / 100) * 2.88) + 0.5 ) | round(2) }}
+
+    # Ligne 2 (Haut) : (Puissance % * 2.88W) + 0.5W (Part ESP)
+    - name: "Puissance Ventilation Ligne 2"
+      unique_id: ventil_baie_power_l2
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      state: >
+        {% set p = states('sensor.esp_fan_puissance_ventilateur_l2') | float(0) %}
+        {{ ( ((p / 100) * 2.88) + 0.5 ) | round(2) }}

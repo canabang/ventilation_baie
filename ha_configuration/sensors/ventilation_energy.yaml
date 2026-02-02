@@ -1,0 +1,22 @@
+# =================================================================================================
+# 📉 INTÉGRATION ÉNERGIE (Riemann)
+# =================================================================================================
+# À placer dans votre dossier de sensors (ex: /config/sensors/energy_ventilation.yaml)
+# Inclus via : sensor: !include_dir_list sensors/
+# =================================================================================================
+
+- platform: integration
+  source: sensor.puissance_ventilation_ligne_1
+  name: "Energie Ventilation Ligne 1"
+  unique_id: energy_ventilation_l1_riemann
+  unit_prefix: k
+  method: left
+  round: 3
+
+- platform: integration
+  source: sensor.puissance_ventilation_ligne_2
+  name: "Energie Ventilation Ligne 2"
+  unique_id: energy_ventilation_l2_riemann
+  unit_prefix: k
+  method: left
+  round: 3
