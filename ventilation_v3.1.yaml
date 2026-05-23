@@ -1,0 +1,443 @@
+# =================================================================================================
+# 🌬️ VENTILATION BAIE V3.1 - Configuration ESPHome (Régulation Delta Dynamique)
+# =================================================================================================
+# Système de ventilation intelligent à 2 zones indépendantes :
+# - Ligne 1 (Zone Haute) : Ventilateurs + Capteur DHT22
+# - Ligne 2 (Zone Basse) : Ventilateurs + Capteur DHT22
+#
+# Logique Dynamique : Consignes indexées sur la température du salon (sensor.sejour)
+# Sécurité : Mémorisation de la dernière valeur reçue de HA & double sécurité surchauffe.
+# =================================================================================================
+
+substitutions:
+  name: "esp-fan"
+  friendly_name: "Ventilation Baie"
+  # Variables pour .base.yaml
+  board: esp32-s3-devkitc-1
+  type: esp-idf
+  loglevel: debug
+  static_ip: 192.168.1.123 # IP fixe du module
+
+packages:
+  base: !include .base.yaml
+
+# Configuration de l'API native avec chiffrement
+api:
+  encryption:
+    key: "VOTRE_CLÉ_API_FOURNIE_PAR_ESPHOME=="
+
+# =================================================================================================
+# MÉMOIRE INTERNE (Variables globales)
+# =================================================================================================
+globals:
+  - id: last_valid_temp_salon
+    type: float
+    restore_value: no
+    initial_value: '24.0'  # Température de secours initiale si HA n'est pas joignable au démarrage
+
+# =================================================================================================
+# MATÉRIEL : SORTIES PWM (Contrôle de vitesse des ventilateurs)
+# =================================================================================================
+output:
+  # PWM Ligne 1 (Zone Haute) - GPIO6
+  - platform: ledc
+    pin: GPIO6
+    id: pwm_line_1
+    frequency: 25000 Hz
+    min_power: 0.0
+    max_power: 1.0
+
+  # PWM Ligne 2 (Zone Basse) - GPIO35
+  - platform: ledc
+    pin: GPIO35
+    id: pwm_line_2
+    frequency: 25000 Hz
+    min_power: 0.0
+    max_power: 1.0
+
+# =================================================================================================
+# CAPTEURS (Tachymètres, DHT22 et Capteur HA Salon)
+# =================================================================================================
+sensor:
+  # --- CAPTEUR SALON DE H.A. ---
+  # Importation du capteur de température du salon depuis Home Assistant
+  - platform: homeassistant
+    id: temp_salon
+    entity_id: sensor.sejour
+    internal: true  # Masque cette entité de diagnostic sur l'interface HA pour éviter les doublons
+    on_value:
+      then:
+        - lambda: |-
+            // Si la valeur reçue est valide (non NaN), on met à jour notre mémoire
+            if (!std::isnan(x)) {
+              id(last_valid_temp_salon) = x;
+              ESP_LOGD("HA_Sensor", "Température salon mise à jour : %.2f°C", x);
+            } else {
+              ESP_LOGW("HA_Sensor", "Valeur reçue invalide (NaN), conservation de la précédente : %.2f°C", id(last_valid_temp_salon));
+            }
+        - script.execute: update_ventilation  # Déclenche la mise à jour des ventilateurs
+
+  # --- LIGNE 1 (Zone Haute) ---
+  
+  # Tachymètre Ligne 1 (GPIO4)
+  - platform: pulse_counter
+    pin: 
+      number: GPIO4
+      mode: {input: true, pullup: true}
+    name: "Vitesse Ligne 1"
+    unit_of_measurement: 'RPM'
+    state_class: "measurement"
+    id: speed_line_1
+    filters: [{lambda: return x / 2.0;}]  # Division par 2
+    update_interval: 3s
+  
+  # Capteur DHT22 Ligne 1 (GPIO7) - Température
+  - platform: dht
+    pin: GPIO7
+    model: DHT22
+    temperature:
+      name: "Température Ligne 1"
+      id: temp_1
+      device_class: "temperature"
+      state_class: "measurement"
+      on_value:
+        then: [script.execute: update_ventilation]  # Déclenche le recalcul à chaque nouvelle mesure
+    update_interval: 5s
+
+  # Calcul de la puissance actuelle (%) Ligne 1
+  - platform: template
+    name: "Puissance Ventilateur L1"
+    unit_of_measurement: "%"
+    state_class: "measurement"
+    icon: "mdi:percent"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(fan_1).state ? id(fan_1).speed : 0;
+    update_interval: 5s
+
+  # --- LIGNE 2 (Zone Basse) ---
+  
+  # Tachymètre Ligne 2 (GPIO36)
+  - platform: pulse_counter
+    pin: 
+      number: GPIO36
+      mode: {input: true, pullup: true}
+    name: "Vitesse Ligne 2"
+    unit_of_measurement: 'RPM'
+    state_class: "measurement"
+    id: speed_line_2
+    filters: [{lambda: return x / 2.0;}]
+    update_interval: 3s
+
+  # Capteur DHT22 Ligne 2 (GPIO37) - Température
+  - platform: dht
+    pin: GPIO37
+    model: DHT22
+    temperature:
+      name: "Température Ligne 2"
+      id: temp_2
+      device_class: "temperature"
+      state_class: "measurement"
+      on_value:
+        then: [script.execute: update_ventilation]
+    update_interval: 5s
+
+  # Calcul de la puissance actuelle (%) Ligne 2
+  - platform: template
+    name: "Puissance Ventilateur L2"
+    unit_of_measurement: "%"
+    state_class: "measurement"
+    icon: "mdi:percent"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(fan_2).state ? id(fan_2).speed : 0;
+    update_interval: 5s
+
+# =================================================================================================
+# VENTILATEURS (Entités Fan pour Home Assistant)
+# =================================================================================================
+fan:
+  - platform: speed
+    output: pwm_line_1
+    name: "Ventilateurs Ligne 1"
+    id: fan_1
+    speed_count: 100
+
+  - platform: speed
+    output: pwm_line_2
+    name: "Ventilateurs Ligne 2"
+    id: fan_2
+    speed_count: 100
+
+# =================================================================================================
+# REGLAGES ET CONSIGNES (Numbers réglables depuis HA)
+# =================================================================================================
+number:
+  # Consigne Delta MIN (Écart minimal par rapport au salon)
+  - platform: template
+    name: "Delta Temp Min"
+    id: global_temp_min
+    min_value: 0
+    max_value: 10
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+    icon: "mdi:thermometer-low"
+    optimistic: true
+    restore_value: true
+    initial_value: 1  # Démarrage dès que la baie dépasse de 1°C le salon
+    set_action:
+      then:
+        - lambda: 'id(global_temp_min).publish_state(x);'
+        - script.execute: update_ventilation
+
+  # Consigne Delta MAX (Écart maximal par rapport au salon)
+  - platform: template
+    name: "Delta Temp Max"
+    id: global_temp_max
+    min_value: 2
+    max_value: 15
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+    icon: "mdi:thermometer-high"
+    optimistic: true
+    restore_value: true
+    initial_value: 5  # Pleine puissance dès que la baie dépasse de 5°C le salon
+    set_action:
+      then:
+        - lambda: 'id(global_temp_max).publish_state(x);'
+        - script.execute: update_ventilation
+
+  # Durée Boost
+  - platform: template
+    name: "Durée Boost"
+    id: boost_duration
+    min_value: 1
+    max_value: 60
+    step: 1
+    unit_of_measurement: "min"
+    mode: box
+    icon: "mdi:timer-outline"
+    optimistic: true
+    restore_value: true
+    initial_value: 10
+    
+  # --- SLIDERS VITESSE MANUELLE ---
+  - platform: template
+    name: "Vitesse Manuelle L1"
+    id: manual_speed_1
+    min_value: 0
+    max_value: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+    icon: "mdi:fan"
+    set_action:
+      then:
+        - lambda: 'id(auto_mode_1).turn_off();' # Coupe l'auto L1 uniquement
+        - if:
+            condition:
+              lambda: 'return x == 0;'
+            then:
+              - fan.turn_off: fan_1
+            else:
+              - fan.turn_on: 
+                  id: fan_1 
+                  speed: !lambda 'return int(x);'
+    lambda: "return id(fan_1).state ? id(fan_1).speed : 0;"
+
+  - platform: template
+    name: "Vitesse Manuelle L2"
+    id: manual_speed_2
+    min_value: 0
+    max_value: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+    icon: "mdi:fan"
+    set_action:
+      then:
+        - lambda: 'id(auto_mode_2).turn_off();' # Coupe l'auto L2 uniquement
+        - if:
+            condition:
+              lambda: 'return x == 0;'
+            then:
+              - fan.turn_off: fan_2
+            else:
+              - fan.turn_on:
+                  id: fan_2
+                  speed: !lambda 'return int(x);'
+    lambda: "return id(fan_2).state ? id(fan_2).speed : 0;"
+
+# =================================================================================================
+# ALERTES SÉCURITÉ
+# =================================================================================================
+binary_sensor:
+  - platform: template
+    name: "Alerte Capteur L1"
+    id: alert_l1
+    device_class: problem
+    icon: "mdi:alert-circle"
+  
+  - platform: template
+    name: "Alerte Capteur L2"
+    id: alert_l2
+    device_class: problem
+    icon: "mdi:alert-circle"
+
+  - platform: template
+    name: "Alerte Surchauffe (Interlock)"
+    id: alert_interlock
+    device_class: heat
+    icon: "mdi:fire-alert"
+
+# =================================================================================================
+# SWITCHES (Modes de fonctionnement)
+# =================================================================================================
+switch:
+  # BOOST GLOBAL
+  - platform: template
+    name: "Mode Boost"
+    id: boost_mode
+    optimistic: true
+    icon: "mdi:rocket-launch"
+    turn_on_action:
+      - logger.log: "🚀 BOOST ACTIF (Global)"
+      - script.execute: update_ventilation # Le script appliquera 100%
+      - delay: !lambda 'return id(boost_duration).state * 60000;'
+      - switch.turn_off: boost_mode
+    turn_off_action:
+      - logger.log: "Fin du Boost"
+      - script.execute: update_ventilation
+
+  # Auto Mode Ligne 1
+  - platform: template
+    name: "Mode Auto Ligne 1"
+    id: auto_mode_1
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    icon: "mdi:thermostat-auto"
+    turn_on_action:
+      - script.execute: update_ventilation
+    turn_off_action:
+      - logger.log: "Mode Auto L1 désactivé"
+
+  # Auto Mode Ligne 2
+  - platform: template
+    name: "Mode Auto Ligne 2"
+    id: auto_mode_2
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    icon: "mdi:thermostat-auto"
+    turn_on_action:
+      - script.execute: update_ventilation
+    turn_off_action:
+      - logger.log: "Mode Auto L2 désactivé"
+
+# =================================================================================================
+# LOGIQUE INTELLIGENTE (Calcul Dynamique)
+# =================================================================================================
+script:
+  - id: update_ventilation
+    mode: restart
+    then:
+      - lambda: |-
+          // 1. Gestion BOOST (Priorité Absolue)
+          if (id(boost_mode).state) {
+            id(fan_1).turn_on().set_speed(100).perform();
+            id(fan_2).turn_on().set_speed(100).perform();
+            return;
+          }
+
+          // Variables Températures Lignes (Sondes DHT locales)
+          float t1 = id(temp_1).state;
+          float t2 = id(temp_2).state;
+          bool t1_valid = !std::isnan(t1);
+          bool t2_valid = !std::isnan(t2);
+
+          // Récupération de la température de référence du salon (mémorisée)
+          float temp_salon_ref = id(last_valid_temp_salon);
+
+          // Calcul des consignes absolues dynamiques (Temp Salon + Delta)
+          float t_min = temp_salon_ref + id(global_temp_min).state;
+          float t_max = temp_salon_ref + id(global_temp_max).state;
+
+          // Seuil critique d'Interlock : Delta Max + 5.0°C ou plafond absolu fixe de 37°C
+          float t_crit_dynamic = t_max + 5.0;
+          float t_crit_absolute = 37.0;
+          float t_crit = std::min(t_crit_dynamic, t_crit_absolute);
+          
+          bool interlock = false;
+
+          // 2. Gestion INTERLOCK (Surchauffe Critique)
+          // Si l'une des zones dépasse le seuil critique (t_crit), tout à fond !
+          if ((t1_valid && t1 >= t_crit) || (t2_valid && t2 >= t_crit)) {
+            interlock = true;
+          }
+          id(alert_interlock).publish_state(interlock);
+
+          if (interlock) {
+            ESP_LOGW("safety", "SURCHAUFFE CRITIQUE (>=%.1f°C) ! Activation Interlock (100%%)", t_crit);
+            id(fan_1).turn_on().set_speed(100).perform();
+            id(fan_2).turn_on().set_speed(100).perform();
+            return;
+          }
+
+          // 3. Calcul LIGNE 1
+          if (id(auto_mode_1).state) {
+            int speed1 = 0;
+            if (!t1_valid) {
+              // Fail-Safe L1 (Sonde DHT HS)
+              speed1 = 50; 
+              id(alert_l1).publish_state(true);
+              ESP_LOGW("safety", "Erreur Capteur L1 -> Fail-Safe 50%%");
+            } else {
+              id(alert_l1).publish_state(false);
+              // Courbe Linéaire Dynamique L1
+              if (t1 < t_min) speed1 = 0;
+              else if (t1 >= t_max) speed1 = 100;
+              else speed1 = (int)(((t1 - t_min) / (t_max - t_min)) * 100);
+            }
+
+            // Application L1 (avec Kickstart si démarrage)
+            if (speed1 == 0) {
+              if (id(fan_1).state) id(fan_1).turn_off().perform();
+            } else {
+              if (!id(fan_1).state) { 
+                // Kickstart
+                id(fan_1).turn_on().set_speed(50).perform();
+                delay(1000); 
+              }
+              id(fan_1).turn_on().set_speed(speed1).perform();
+            }
+          }
+
+          // 4. Calcul LIGNE 2
+          if (id(auto_mode_2).state) {
+            int speed2 = 0;
+            if (!t2_valid) {
+              // Fail-Safe L2 (Sonde DHT HS)
+              speed2 = 50;
+              id(alert_l2).publish_state(true);
+              ESP_LOGW("safety", "Erreur Capteur L2 -> Fail-Safe 50%%");
+            } else {
+              id(alert_l2).publish_state(false);
+              // Courbe Linéaire Dynamique L2
+              if (t2 < t_min) speed2 = 0;
+              else if (t2 >= t_max) speed2 = 100;
+              else speed2 = (int)(((t2 - t_min) / (t_max - t_min)) * 100);
+            }
+
+            // Application L2 (avec Kickstart si démarrage)
+            if (speed2 == 0) {
+              if (id(fan_2).state) id(fan_2).turn_off().perform();
+            } else {
+              if (!id(fan_2).state) {
+                 // Kickstart
+                 id(fan_2).turn_on().set_speed(50).perform();
+                 delay(1000);
+              }
+              id(fan_2).turn_on().set_speed(speed2).perform();
+            }
+          }

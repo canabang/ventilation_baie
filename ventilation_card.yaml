@@ -284,15 +284,15 @@ views:
               - type: custom:streamline-card
                 template: mushroom_number_buttons
                 variables:
-                  name: Min
-                  entity: number.esp_fan_consigne_temp_min
+                  name: Delta Min
+                  entity: number.esp_fan_delta_temp_min
                   icon: mdi:thermometer-low
               - type: custom:streamline-card
                 template: mushroom_number_buttons
                 variables:
-                  - name: Max
-                  - entity: number.esp_fan_consigne_temp_max
-                  - icon: mdi:thermometer-high
+                  name: Delta Max
+                  entity: number.esp_fan_delta_temp_max
+                  icon: mdi:thermometer-high
         columns: 1
 
       # =================================================================================

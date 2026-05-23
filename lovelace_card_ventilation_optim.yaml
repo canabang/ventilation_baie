@@ -1,0 +1,385 @@
+# ==============================================================================
+# 📊 CARTE LOVELACE COMPLÈTE : VENTILATION DYNAMIQUE DE LA BAIE (v1.8.0)
+# ==============================================================================
+# Cette carte affiche l'état complet du système de ventilation de la baie.
+# Elle s'harmonise avec le design "Glassmorphism" et sombre de la suite.
+# ==============================================================================
+
+type: custom:button-card
+entity: switch.esp_fan_mode_boost
+name: Ventilation Baie
+icon: mdi:fan
+show_state: false
+tap_action:
+  action: none  # Désactivé à la racine pour éviter les clics accidentels
+styles:
+  card:
+    - background: "rgba(255, 255, 255, 0.03)"
+    - border-radius: 24px
+    - border: "1.5px solid rgba(255, 255, 255, 0.12)"
+    - box-shadow: "0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.1)"
+    - padding: 18px
+    - color: "#ffffff"
+    - pointer-events: auto !important
+  grid:
+    - grid-template-areas: >-
+        "i n" "boost boost" "l1 l1" "l2 l2" "consignes consignes" "footer footer"
+    - grid-template-columns: 45px 1fr
+    - grid-template-rows: auto
+  icon:
+    - color: |
+        [[[
+          if (entity.state === 'on') return '#c0392b';
+          const isInterlock = states['binary_sensor.esp_fan_alerte_surchauffe_interlock'].state === 'on';
+          if (isInterlock) return '#c0392b';
+          return '#2E8B57';
+        ]]]
+    - width: 28px
+    - animation: |
+        [[[
+          if (entity.state === 'on') return 'pulse_critical 0.8s infinite ease-in-out';
+          const isInterlock = states['binary_sensor.esp_fan_alerte_surchauffe_interlock'].state === 'on';
+          if (isInterlock) return 'pulse_critical 0.8s infinite ease-in-out';
+          return 'pulse_normal 3s infinite ease-in-out';
+        ]]]
+  name:
+    - font-size: 15px
+    - font-weight: 800
+    - letter-spacing: 1px
+    - justify-self: start
+    - align-self: center
+    - text-shadow: 0 2px 4px rgba(0,0,0,0.5)
+    - margin-left: 8px
+
+custom_fields:
+  boost: |
+    [[[
+      const isBoost = entity.state === 'on';
+      const duration = states['number.esp_fan_duree_boost'].state || '10';
+      const text = isBoost ? `<span style="animation: pulse_critical 1s infinite; color: #c0392b;">🚀 Boost Actif</span>` : `Boost Inactif`;
+      return `
+        <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 12px; font-size: 12px; font-weight: 600;">
+          <span style="color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 8px; cursor: pointer;"
+                onclick="document.querySelector('home-assistant').hass.callService('switch', 'toggle', {entity_id: 'switch.esp_fan_mode_boost'}); event.stopPropagation();">
+            <ha-icon icon="mdi:rocket-launch" style="width: 16px; height: 16px; color: ${isBoost ? '#c0392b' : 'rgba(255,255,255,0.4)'};"></ha-icon>
+            ${text}
+          </span>
+          <span style="display: flex; align-items: center; gap: 8px;">
+            <span class="duration-btn" onclick="const val = Math.max(1, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_duree_boost'].state) - 1); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_duree_boost', value: val}); event.stopPropagation();">—</span>
+            <span style="color: #3498db; width: 42px; text-align: center; font-weight: 800;">${parseFloat(duration).toFixed(0)} min</span>
+            <span class="duration-btn" onclick="const val = Math.min(60, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_duree_boost'].state) + 1); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_duree_boost', value: val}); event.stopPropagation();">+</span>
+          </span>
+        </div>
+      `;
+    ]]]
+
+  l1: |
+    [[[
+      const temp = parseFloat(states['sensor.esp_fan_temperature_ligne_1'].state) || 0;
+      const rpm = parseFloat(states['sensor.esp_fan_vitesse_ligne_1'].state) || 0;
+      const power = parseFloat(states['sensor.esp_fan_puissance_ventilateur_l1'].state) || 0;
+      const isAuto = states['switch.esp_fan_mode_auto_ligne_1'].state === 'on';
+      const isAlert = states['binary_sensor.esp_fan_alerte_capteur_l1'].state === 'on';
+      
+      const salon = parseFloat(states['sensor.sejour'].state) || 24.0;
+      const delta_min = parseFloat(states['number.esp_fan_delta_temp_min'].state) || 1.0;
+      const delta_max = parseFloat(states['number.esp_fan_delta_temp_max'].state) || 5.0;
+      const t_min = salon + delta_min;
+      const t_max = salon + delta_max;
+      const t_crit = Math.min(t_max + 5.0, 37.0);
+
+      // 🌡️ Couleur Température : Orange à -1.0°C du max
+      let color_temp = '#3498db'; // Bleu par défaut (Froid, <= t_min)
+      if (isAlert) {
+        color_temp = '#c0392b';
+      } else if (temp > t_min && temp <= t_max - 1.0) {
+        color_temp = '#2E8B57'; // Vert (Nominale / régulée)
+      } else if (temp > t_max - 1.0 && temp <= t_max) {
+        color_temp = '#d35400'; // Orange (Approche du max, à -1.0°C)
+      } else if (temp > t_max && temp <= t_crit) {
+        color_temp = '#e74c3c'; // Rouge-Orange (Plein régime)
+      } else if (temp > t_crit) {
+        color_temp = '#c0392b'; // Rouge (Surchauffe)
+      }
+
+      // ⚙️ Couleur Rotation / Effort (Seuils : Vert <= 75%, Orange <= 90%, Rouge > 90%)
+      let color_rot = 'rgba(255,255,255,0.4)';
+      if (power > 0 && power <= 75) {
+        color_rot = '#2E8B57'; // Vert (Nominal)
+      } else if (power > 75 && power <= 90) {
+        color_rot = '#d35400'; // Orange (Élevé)
+      } else if (power > 90) {
+        color_rot = '#c0392b'; // Rouge (Critique / Maximum)
+      }
+      
+      // Vitesse de rotation animée basée sur le RPM réel (0 à 3000+ RPM)
+      const speed_fan = rpm > 0 ? Math.max(0.3, 4.0 - (rpm / 3000) * 3.7) : 0;
+      const anim_fan = rpm > 0 ? `spin ${speed_fan.toFixed(2)}s linear infinite` : 'none';
+      const label_temp = isAlert ? 'ERREUR' : `${temp.toFixed(1)}°C`;
+      const mode_label = isAuto 
+        ? `<span style="color: #3498db; text-decoration: underline; cursor: pointer;" onclick="document.querySelector('home-assistant').hass.callService('switch', 'toggle', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); event.stopPropagation();">[Auto]</span>` 
+        : `<span style="color: #e67e22; text-decoration: underline; cursor: pointer;" onclick="document.querySelector('home-assistant').hass.callService('switch', 'toggle', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); event.stopPropagation();">[Manuel]</span>`;
+      
+      return `
+        <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+          <!-- Ligne supérieure interactive : Clic simple pour Marche/Arrêt -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; margin-bottom: 6px; cursor: pointer;"
+               onclick="const auto = document.querySelector('home-assistant').hass.states['switch.esp_fan_mode_auto_ligne_1'].state === 'on'; const p = parseFloat(document.querySelector('home-assistant').hass.states['sensor.esp_fan_puissance_ventilateur_l1'].state) || 0; if (auto || p > 0) { document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l1', value: 0}); } else { document.querySelector('home-assistant').hass.callService('switch', 'turn_on', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); }; event.stopPropagation();"
+               title="Clic simple pour démarrer/arrêter la ligne">
+            <span style="color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; animation: ${anim_fan}; transform-origin: center center;">
+                <ha-icon icon="mdi:fan" style="width: 18px; height: 18px; color: ${power > 0 ? color_rot : 'rgba(255,255,255,0.4)'}; display: block; filter: drop-shadow(0 0 2px ${power > 0 ? color_rot : 'transparent'});"></ha-icon>
+              </span>
+              Ligne 1 (Haut) ${mode_label}
+            </span>
+            <span style="color: ${color_temp}; font-weight: 800;">
+              ${label_temp} <span style="font-size: 10px; color: rgba(255,255,255,0.4);">(${rpm.toFixed(0)} RPM)</span>
+            </span>
+          </div>
+          
+          <!-- Contrôle direct de vitesse (Boutons +/- et jauge fixe) -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="speed-btn" onclick="const val = Math.max(0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_vitesse_manuelle_l1'].state) - 10); document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l1', value: val}); event.stopPropagation();"
+                  title="Diminuer la vitesse manuelle (Force le mode Manuel)">—</span>
+            
+            <div style="flex-grow: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 6px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.03);">
+              <div style="width: ${power}%; background: ${power > 0 ? color_rot : 'rgba(255,255,255,0.2)'}; height: 100%; border-radius: 4px; transition: width 0.6s ease-in-out;"></div>
+            </div>
+            
+            <span style="font-size: 11px; font-weight: 800; color: ${power > 0 ? color_rot : 'rgba(255,255,255,0.4)'}; width: 28px; text-align: right;">${power.toFixed(0)}%</span>
+            
+            <span class="speed-btn" onclick="const val = Math.min(100, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_vitesse_manuelle_l1'].state) + 10); document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_1'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l1', value: val}); event.stopPropagation();"
+                  title="Augmenter la vitesse manuelle (Force le mode Manuel)">+</span>
+          </div>
+        </div>
+      `;
+    ]]]
+
+  l2: |
+    [[[
+      const temp = parseFloat(states['sensor.esp_fan_temperature_ligne_2'].state) || 0;
+      const rpm = parseFloat(states['sensor.esp_fan_vitesse_ligne_2'].state) || 0;
+      const power = parseFloat(states['sensor.esp_fan_puissance_ventilateur_l2'].state) || 0;
+      const isAuto = states['switch.esp_fan_mode_auto_ligne_2'].state === 'on';
+      const isAlert = states['binary_sensor.esp_fan_alerte_capteur_l2'].state === 'on';
+      
+      const salon = parseFloat(states['sensor.sejour'].state) || 24.0;
+      const delta_min = parseFloat(states['number.esp_fan_delta_temp_min'].state) || 1.0;
+      const delta_max = parseFloat(states['number.esp_fan_delta_temp_max'].state) || 5.0;
+      const t_min = salon + delta_min;
+      const t_max = salon + delta_max;
+      const t_crit = Math.min(t_max + 5.0, 37.0);
+
+      // 🌡️ Couleur Température : Orange à -1.0°C du max
+      let color_temp = '#3498db'; // Bleu par défaut (Froid, <= t_min)
+      if (isAlert) {
+        color_temp = '#c0392b';
+      } else if (temp > t_min && temp <= t_max - 1.0) {
+        color_temp = '#2E8B57'; // Vert (Nominale / régulée)
+      } else if (temp > t_max - 1.0 && temp <= t_max) {
+        color_temp = '#d35400'; // Orange (Approche du max, à -1.0°C)
+      } else if (temp > t_max && temp <= t_crit) {
+        color_temp = '#e74c3c'; // Rouge-Orange (Plein régime)
+      } else if (temp > t_crit) {
+        color_temp = '#c0392b'; // Rouge (Surchauffe)
+      }
+
+      // ⚙️ Couleur Rotation / Effort (Seuils : Vert <= 75%, Orange <= 90%, Rouge > 90%)
+      let color_rot = 'rgba(255,255,255,0.4)';
+      if (power > 0 && power <= 75) {
+        color_rot = '#2E8B57'; // Vert (Nominal)
+      } else if (power > 75 && power <= 90) {
+        color_rot = '#d35400'; // Orange (Élevé)
+      } else if (power > 90) {
+        color_rot = '#c0392b'; // Rouge (Critique / Maximum)
+      }
+      
+      // Vitesse de rotation animée basée sur le RPM réel (0 à 3000+ RPM)
+      const speed_fan = rpm > 0 ? Math.max(0.3, 4.0 - (rpm / 3000) * 3.7) : 0;
+      const anim_fan = rpm > 0 ? `spin ${speed_fan.toFixed(2)}s linear infinite` : 'none';
+      const label_temp = isAlert ? 'ERREUR' : `${temp.toFixed(1)}°C`;
+      const mode_label = isAuto 
+        ? `<span style="color: #3498db; text-decoration: underline; cursor: pointer;" onclick="document.querySelector('home-assistant').hass.callService('switch', 'toggle', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); event.stopPropagation();">[Auto]</span>` 
+        : `<span style="color: #e67e22; text-decoration: underline; cursor: pointer;" onclick="document.querySelector('home-assistant').hass.callService('switch', 'toggle', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); event.stopPropagation();">[Manuel]</span>`;
+      
+      return `
+        <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+          <!-- Ligne supérieure interactive : Clic simple pour Marche/Arrêt -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; margin-bottom: 6px; cursor: pointer;"
+               onclick="const auto = document.querySelector('home-assistant').hass.states['switch.esp_fan_mode_auto_ligne_2'].state === 'on'; const p = parseFloat(document.querySelector('home-assistant').hass.states['sensor.esp_fan_puissance_ventilateur_l2'].state) || 0; if (auto || p > 0) { document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l2', value: 0}); } else { document.querySelector('home-assistant').hass.callService('switch', 'turn_on', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); }; event.stopPropagation();"
+               title="Clic simple pour démarrer/arrêter la ligne">
+            <span style="color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; animation: ${anim_fan}; transform-origin: center center;">
+                <ha-icon icon="mdi:fan" style="width: 18px; height: 18px; color: ${power > 0 ? color_rot : 'rgba(255,255,255,0.4)'}; display: block; filter: drop-shadow(0 0 2px ${power > 0 ? color_rot : 'transparent'});"></ha-icon>
+              </span>
+              Ligne 2 (Bas) ${mode_label}
+            </span>
+            <span style="color: ${color_temp}; font-weight: 800;">
+              ${label_temp} <span style="font-size: 10px; color: rgba(255,255,255,0.4);">(${rpm.toFixed(0)} RPM)</span>
+            </span>
+          </div>
+          
+          <!-- Contrôle direct de vitesse (Boutons +/- et jauge fixe) -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="speed-btn" onclick="const val = Math.max(0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_vitesse_manuelle_l2'].state) - 10); document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l2', value: val}); event.stopPropagation();"
+                  title="Diminuer la vitesse manuelle (Force le mode Manuel)">—</span>
+            
+            <div style="flex-grow: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 6px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.03);">
+              <div style="width: ${power}%; background: ${power > 0 ? color_rot : 'rgba(255,255,255,0.2)'}; height: 100%; border-radius: 4px; transition: width 0.6s ease-in-out;"></div>
+            </div>
+            
+            <span style="font-size: 11px; font-weight: 800; color: ${power > 0 ? color_rot : 'rgba(255,255,255,0.4)'}; width: 28px; text-align: right;">${power.toFixed(0)}%</span>
+            
+            <span class="speed-btn" onclick="const val = Math.min(100, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_vitesse_manuelle_l2'].state) + 10); document.querySelector('home-assistant').hass.callService('switch', 'turn_off', {entity_id: 'switch.esp_fan_mode_auto_ligne_2'}); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_vitesse_manuelle_l2', value: val}); event.stopPropagation();"
+                  title="Augmenter la vitesse manuelle (Force le mode Manuel)">+</span>
+          </div>
+        </div>
+      `;
+    ]]]
+
+  consignes: |
+    [[[
+      const salon = parseFloat(states['sensor.sejour'].state) || 24.0;
+      const delta_min = parseFloat(states['number.esp_fan_delta_temp_min'].state) || 1.0;
+      const delta_max = parseFloat(states['number.esp_fan_delta_temp_max'].state) || 5.0;
+      
+      const limit_min = salon + delta_min;
+      const limit_max = salon + delta_max;
+      const limit_crit = Math.min(limit_max + 5.0, 37.0);
+      
+      return `
+        <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; font-size: 11px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-weight: 600; color: rgba(255,255,255,0.8);">
+            <span>🏠 Référence Salon</span>
+            <span style="color: #2E8B57; font-weight: 800;">${salon.toFixed(1)}°C</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; margin-top: 4px;">
+            <!-- Seuil Min -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 6px 4px;">
+              <div style="color: rgba(255,255,255,0.4); font-size: 9px; font-weight: 600;">SEUIL MIN</div>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin: 4px 0;">
+                <span class="consigne-btn" onclick="const val = Math.max(0.0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_delta_temp_min'].state) - 0.5); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_delta_temp_min', value: val}); event.stopPropagation();">—</span>
+                <span style="color: #3498db; font-size: 11px; font-weight: 800; min-width: 32px;">+${delta_min.toFixed(1)}°</span>
+                <span class="consigne-btn" onclick="const val = Math.min(10.0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_delta_temp_min'].state) + 0.5); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_delta_temp_min', value: val}); event.stopPropagation();">+</span>
+              </div>
+              <div style="color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 800;">${limit_min.toFixed(1)}°C</div>
+            </div>
+            
+            <!-- Seuil Max -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 6px 4px;">
+              <div style="color: rgba(255,255,255,0.4); font-size: 9px; font-weight: 600;">SEUIL MAX</div>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin: 4px 0;">
+                <span class="consigne-btn" onclick="const val = Math.max(1.0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_delta_temp_max'].state) - 0.5); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_delta_temp_max', value: val}); event.stopPropagation();">—</span>
+                <span style="color: #e67e22; font-size: 11px; font-weight: 800; min-width: 32px;">+${delta_max.toFixed(1)}°</span>
+                <span class="consigne-btn" onclick="const val = Math.min(15.0, parseFloat(document.querySelector('home-assistant').hass.states['number.esp_fan_delta_temp_max'].state) + 0.5); document.querySelector('home-assistant').hass.callService('number', 'set_value', {entity_id: 'number.esp_fan_delta_temp_max', value: val}); event.stopPropagation();">+</span>
+              </div>
+              <div style="color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 800;">${limit_max.toFixed(1)}°C</div>
+            </div>
+            
+            <!-- Seuil Critique -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 6px 4px;">
+              <div style="color: rgba(255,255,255,0.4); font-size: 9px; font-weight: 600;">CRITIQUE</div>
+              <div style="margin: 7px 0; color: #e74c3c; font-size: 11px; font-weight: 800;">${limit_crit.toFixed(1)}°C</div>
+              <div style="color: rgba(255,255,255,0.3); font-size: 8px;">Interlock</div>
+            </div>
+          </div>
+        </div>
+      `;
+    ]]]
+
+  footer: |
+    [[[
+      const uptime = states['sensor.esp_fan_uptime'].state || 'N/A';
+      const interlock = states['binary_sensor.esp_fan_alerte_surchauffe_interlock'].state === 'on';
+      const isL1Err = states['binary_sensor.esp_fan_alerte_capteur_l1'].state === 'on';
+      const isL2Err = states['binary_sensor.esp_fan_alerte_capteur_l2'].state === 'on';
+      
+      let security_status = '<span style="color: #2E8B57; font-weight:800;">SÉCURITÉ OK</span>';
+      if (interlock) {
+        security_status = '<span style="color: #c0392b; font-weight:800; animation: pulse_critical 1s infinite;">SURCHAUFFE CRITIQUE</span>';
+      } else if (isL1Err || isL2Err) {
+        security_status = '<span style="color: #d35400; font-weight:800;">SONDE DÉFAILLANTE</span>';
+      }
+      
+      return `
+        <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: rgba(255,255,255,0.5);">
+          <span>🛡️ ${security_status}</span>
+          <span>⏱️ Uptime: <b style="color: rgba(255,255,255,0.8);">${uptime}</b></span>
+        </div>
+      `;
+    ]]]
+
+extra_styles: |
+  .duration-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .duration-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  .consigne-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 10px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1;
+  }
+  .consigne-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  .speed-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1;
+  }
+  .speed-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes pulse_normal {
+    0% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(46, 139, 87, 0.2)); opacity: 0.8; }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 6px rgba(46, 139, 87, 0.6)); opacity: 1; }
+    100% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(46, 139, 87, 0.2)); opacity: 0.8; }
+  }
+  @keyframes pulse_critical {
+    0% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(192, 57, 43, 0.5)); opacity: 0.6; }
+    50% { transform: scale(1.18); filter: drop-shadow(0 0 14px rgba(192, 57, 43, 1)); opacity: 1; }
+    100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(192, 57, 43, 0.5)); opacity: 0.6; }
+  }
